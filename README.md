@@ -177,6 +177,15 @@ Plugins are ordinary packages. Ship them privately inside your company, publish 
 
 For the full extension guide, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
+## Documentation map
+
+- [ARCHITECTURE.md](./ARCHITECTURE.md) — system design and plugin model overview
+- [`docs/modules/`](./docs/modules/README.md) — what each Phase 1 module covers (MD, FI, CO, MM, PP)
+- [`docs/identity/`](./docs/identity/README.md) — tenancy, users, roles, permissions, authentication
+- [`docs/roadmap/`](./docs/roadmap/README.md) — release milestones
+- [`docs/decisions/`](./docs/decisions/README.md) — architectural decision records
+- [CONTRIBUTING.md](./CONTRIBUTING.md) — how to get involved
+
 ## Contributing
 
 Community is what makes this project succeed or fail. If you are:

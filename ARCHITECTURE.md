@@ -158,10 +158,14 @@ Each domain module owns its tables, its services, and its public API. Modules **
 
 ```mermaid
 flowchart TB
-    subgraph Finance["Finance Module"]
+    subgraph Finance["Finance & Controlling Module"]
         FS[FinanceService]
-        FT[(fin_* tables)]
+        CS[ControllingService]
+        FT[(fin_* tables — universal journal)]
+        CT[(co_* tables — cost/profit centres, orders)]
         FS --- FT
+        CS --- CT
+        CS --- FT
     end
 
     subgraph Materials["Materials Module"]
@@ -190,7 +194,11 @@ flowchart TB
     Finance -->|subscribes to events from| Production
 ```
 
-Table name prefixes (`fin_`, `mm_`, `pp_`, `md_`) make module ownership visible at a glance. Crossing boundaries means calling a service, never a JOIN.
+Table name prefixes (`md_` master data, `fin_` universal journal for FI + CO, `co_` CO-owned master data, `mm_` materials, `pp_` production, `id_` identity) make module ownership visible at a glance. Crossing boundaries means calling a service, never a JOIN.
+
+FI and CO share the posting tables (`fin_document_header`, `fin_document_line`) rather than maintaining separate ledgers. Every FI line carries cost centre, profit centre, internal order, and other CO dimensions as columns. This mirrors S/4HANA's `ACDOCA` model and removes the entire class of FI/CO reconciliation problems that plagued prior ERP generations. CO therefore owns its master data (`co_cost_centre`, `co_profit_centre`, `co_internal_order`, allocation cycles) but consumes FI's posting engine for actuals.
+
+For the functional scope of each module, see [`docs/modules/`](./docs/modules/README.md). For identity, tenancy, and authorisation, see [`docs/identity/`](./docs/identity/README.md).
 
 ---
 
