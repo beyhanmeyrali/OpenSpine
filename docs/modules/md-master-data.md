@@ -32,7 +32,7 @@ Master Data is the foundation every other module stands on. It defines the organ
 
 ## 4. Core entities
 
-Tables use the `md_` prefix. This is representative, not exhaustive — detailed schema lives in [`/docs/architecture/data-model.md`](../architecture/data-model.md) once written.
+Tables use the `md_` prefix. This is representative, not exhaustive — schema conventions (PK strategy, tenant_id + RLS, audit columns, indexing, etc.) live in [`/docs/architecture/data-model.md`](../architecture/data-model.md). Per-table column-level details land alongside the migrations in v0.1 §4.4.
 
 | Table | Purpose |
 |-------|---------|
