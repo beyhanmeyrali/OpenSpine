@@ -117,7 +117,19 @@ Commits on `claude/review-codebase-8XRRf`, oldest first:
 - Add HANDOFF.md for overnight session continuity
 - Wire OpenTelemetry tracing and Prometheus metrics (v0.1 §4.8)
 - Event bus contract + embedding worker skeleton (v0.1 §4.5)
+- Add Dockerfile and event catalogue
+- Add data-model and plugin-system architecture deep-dives
 - (further commits land below this line)
+
+## Open questions queued
+
+See `NEEDS-INPUT.md`. Seven items. Top three blocking real work:
+
+1. Hook-naming canonical form (blocks plugin host hardening, §4.6)
+2. AGPL plugin distribution implications (ADR 0004)
+3. Audit-log topology — write the missing section in identity/README
+
+The rest are not blockers; they're queued at your convenience.
 
 ## Verification cheat-sheet
 
