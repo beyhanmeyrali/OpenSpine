@@ -74,7 +74,7 @@ Update this list as work-streams move through their states.
 | 4.2 | Identity core | PENDING-OWNER-INPUT | Schema design depends on the database-per-tenant vs shared+RLS open question (`tenancy.md` Q1). Won't proceed unattended. |
 | 4.3 | RBAC + auth-object engine | BLOCKED-ON-4.2 | Needs identity tables first. |
 | 4.4 | Master Data core | BLOCKED-ON-4.2 | Needs `tenant_id` and RLS in place first. |
-| 4.5 | Event bus + embedding pipeline | IN PROGRESS | Skeleton can land without identity. |
+| 4.5 | Event bus + embedding pipeline | SKELETON DONE | Event envelope + EventBus protocol + InMemoryEventBus + glob pattern matcher (`*`/`**`); per-tenant Qdrant collection naming convention (`openspine__<tenant>`); embedding worker entrypoint subscribed to `master_data.**`. Real Redis/Qdrant clients deferred until integration tests can run. 41 tests pass. |
 | 4.6 | Plugin host | BLOCKED-ON-DECISION | Hook-naming reconciliation must be resolved before hardening. |
 | 4.7 | Agent surface | BLOCKED-ON-4.2/4.4/4.5 | |
 | 4.8 | Observability | DONE | OTel tracing scaffolded with FastAPI auto-instrumentation; Prometheus `/metrics` endpoint; `MetricsMiddleware` records request count + latency by (method, route, status); domain-shaped counters/histograms (events, embedding lag, auth decisions, hook dispatch) registered. 18 tests pass. |
