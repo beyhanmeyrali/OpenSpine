@@ -1,0 +1,27 @@
+# OpenSpine — editor defaults.
+# Anything in this repo opens with these settings if your editor honours
+# .editorconfig. Python and TypeScript style is enforced more strictly by
+# ruff and the future eslint config.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{md,mdx}]
+trim_trailing_whitespace = false
+indent_size = 2
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[*.{json,ts,tsx,js,jsx,html,css}]
+indent_size = 2
+
+[Makefile]
+indent_style = tab

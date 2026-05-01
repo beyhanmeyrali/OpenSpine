@@ -1,0 +1,46 @@
+# OpenSpine — pre-commit hooks.
+# Install with `pre-commit install` (run automatically by `make dev`).
+# All hooks must be fast enough that committing doesn't feel slow.
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.md$
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        files: ^src/
+        additional_dependencies:
+          - pydantic>=2.9
+          - pydantic-settings>=2.6
+          - sqlalchemy>=2.0.36
+
+  # DCO sign-off — required by CONTRIBUTING.md
+  - repo: https://github.com/sirosen/check-jsonschema
+    rev: 0.30.0
+    hooks:
+      - id: check-github-workflows
+
+# Local hook to verify DCO sign-off on every commit message.
+default_install_hook_types: [pre-commit, commit-msg]

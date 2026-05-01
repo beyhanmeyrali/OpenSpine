@@ -208,3 +208,9 @@ __marimo__/
 
 # Personal / unpublished drafts
 MediaPosts.md
+
+# Local environment file (generated from .env.example, never committed)
+.env
+
+# Plan files written by Claude Code (kept out of repo)
+.claude/plans/
