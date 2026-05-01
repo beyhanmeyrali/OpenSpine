@@ -3,7 +3,7 @@
 > **The open-source, AI-native ERP.** A free alternative to the legacy enterprise giants, built for the age of intelligent systems.
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Status: Pre-Alpha](https://img.shields.io/badge/Status-Pre--Alpha-orange.svg)]()
+[![Status: Pre-Alpha](https://img.shields.io/badge/Status-Pre--Alpha-orange.svg)](./docs/roadmap/README.md)
 
 ---
 
@@ -52,10 +52,12 @@ Deliberately **out of scope** for Phase 1: HR, Plant Maintenance, Quality Manage
 └──────┬────────────────────────────────────────┬─────────────┘
        │                                        │
 ┌──────┴───────────────┐              ┌────────┴─────────────┐
-│    PostgreSQL        │   ⇄ sync ⇄   │       Qdrant         │
-│  (transactional      │              │  (semantic index,    │
+│    PostgreSQL        │ → async      │       Qdrant         │
+│  (transactional      │   index →    │  (semantic index,    │
 │   source of truth)   │              │   embeddings)        │
 └──────────────────────┘              └──────────────────────┘
+        Authoritative                  Eventually-consistent
+                                       derivative; rebuildable
 ```
 
 ### Design principles
@@ -72,6 +74,7 @@ Deliberately **out of scope** for Phase 1: HR, Plant Maintenance, Quality Manage
 |-------|--------|-----|
 | Backend | **Python 3.12 + FastAPI** | Fast, async, excellent typing, AI-tool-friendly codebase |
 | Database | **PostgreSQL 16** | Mature, handles complex relational schemas, rock-solid in production |
+| Event bus | **Redis Streams** | Append-only, replayable, fans out events to embedding worker, plugins, integrations |
 | Vector store | **Qdrant** | Purpose-built, scales independently, proven in production |
 | Embeddings | **Qwen3-Embedding (local via Ollama)** | Zero-cost, self-hosted, no vendor lock-in |
 | Frontend | **React 18 + TypeScript + Vite** | Type-safe, component ecosystem, contributor-friendly |

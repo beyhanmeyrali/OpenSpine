@@ -29,6 +29,8 @@ Each module owns its tables, its services, and its public API. Modules never rea
 
 Dependencies flow one way. No module depends on a module that depends back on it. The event bus is the only path for async cross-module reaction.
 
+Arrow convention (consistent with `ARCHITECTURE.md` §5): **`A --> B` means "A calls / depends on B"**. So if you want to read off "what does FI depend on?" — follow the arrows leaving FI.
+
 ```mermaid
 flowchart TB
     MD[Master Data]
@@ -37,11 +39,11 @@ flowchart TB
     MM[Materials Management]
     PP[Production Planning]
 
-    MD --> FI
-    MD --> CO
-    MD --> MM
-    MD --> PP
-    FI --> CO
+    FI --> MD
+    CO --> MD
+    MM --> MD
+    PP --> MD
+    CO --> FI
     MM -->|posts to| FI
     MM -->|commits/consumes| CO
     PP -->|posts to| FI
