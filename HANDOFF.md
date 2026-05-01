@@ -77,7 +77,7 @@ Update this list as work-streams move through their states.
 | 4.5 | Event bus + embedding pipeline | IN PROGRESS | Skeleton can land without identity. |
 | 4.6 | Plugin host | BLOCKED-ON-DECISION | Hook-naming reconciliation must be resolved before hardening. |
 | 4.7 | Agent surface | BLOCKED-ON-4.2/4.4/4.5 | |
-| 4.8 | Observability | IN PROGRESS | OpenTelemetry + Prometheus instrumentation. Uncontroversial. |
+| 4.8 | Observability | DONE | OTel tracing scaffolded with FastAPI auto-instrumentation; Prometheus `/metrics` endpoint; `MetricsMiddleware` records request count + latency by (method, route, status); domain-shaped counters/histograms (events, embedding lag, auth decisions, hook dispatch) registered. 18 tests pass. |
 
 ## Open questions accumulating for owner review
 

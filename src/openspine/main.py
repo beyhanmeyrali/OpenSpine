@@ -13,18 +13,27 @@ modules (identity, md, fi, co, mm, pp). The app's job here is to:
 
 from __future__ import annotations
 
+import time
 from contextlib import asynccontextmanager
 from typing import Any
 
 import structlog
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from openspine import __version__
 from openspine.config import get_settings
 from openspine.core.errors import OpenSpineError
 from openspine.core.hooks import registered_hooks
 from openspine.core.logging import configure_logging
+from openspine.core.observability import (
+    configure_tracing,
+    http_request_duration_seconds,
+    http_requests_total,
+    instrument_app,
+    metrics_response_body,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -33,6 +42,8 @@ logger = structlog.get_logger(__name__)
 async def lifespan(app: FastAPI) -> Any:
     settings = get_settings()
     configure_logging(settings.log_level)
+    configure_tracing(settings)
+    instrument_app(app)
     logger.info("openspine.startup", version=__version__, env=settings.env)
     yield
     logger.info("openspine.shutdown")
@@ -57,6 +68,33 @@ app = FastAPI(
         {"name": "production", "description": "Plan-to-produce. (v0.4)"},
     ],
 )
+
+
+class MetricsMiddleware(BaseHTTPMiddleware):
+    """Record request count and latency per (method, route, status).
+
+    Uses the matched route template (e.g. `/system/health`) rather than the
+    raw path so cardinality stays bounded. Unmatched paths are bucketed
+    under `unmatched`.
+    """
+
+    async def dispatch(self, request: Request, call_next: Any) -> Response:  # type: ignore[override]
+        start = time.perf_counter()
+        response = await call_next(request)
+        elapsed = time.perf_counter() - start
+        route = request.scope.get("route")
+        route_template = getattr(route, "path", None) or "unmatched"
+        labels = {
+            "method": request.method,
+            "route": route_template,
+            "status": str(response.status_code),
+        }
+        http_requests_total.labels(**labels).inc()
+        http_request_duration_seconds.labels(**labels).observe(elapsed)
+        return response
+
+
+app.add_middleware(MetricsMiddleware)
 
 
 @app.exception_handler(OpenSpineError)
@@ -108,3 +146,15 @@ async def list_hooks() -> dict[str, dict[str, int]]:
     the available extension surface.
     """
     return registered_hooks()
+
+
+@app.get("/metrics", tags=["system"], include_in_schema=False)
+async def metrics() -> Response:
+    """Prometheus exposition endpoint.
+
+    Excluded from the OpenAPI schema because the wire format is text,
+    not JSON, and clients consuming it (Prometheus scrapers) don't read
+    OpenAPI.
+    """
+    body, content_type = metrics_response_body()
+    return Response(content=body, media_type=content_type)
