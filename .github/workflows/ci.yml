@@ -47,7 +47,13 @@ jobs:
     if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
-      - name: Build (placeholder until Dockerfile lands)
-        run: |
-          echo "Dockerfile lands with v0.1 §4.1 completion."
-          echo "Build step is a placeholder — failing here will fail CI."
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: openspine:ci-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

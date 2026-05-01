@@ -1,0 +1,39 @@
+# Keep the build context small so docker build is fast.
+
+.git
+.github
+.venv
+.venv-*
+.env
+.env.*
+!.env.example
+
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.mypy_cache
+.ruff_cache
+htmlcov
+.coverage
+.coverage.*
+coverage.xml
+build
+dist
+*.egg-info
+
+# Tests aren't needed in the runtime image.
+tests
+
+# Docs aren't needed in the runtime image either.
+docs
+*.md
+!README.md
+
+# Local-only artefacts.
+docker-compose.yml
+Makefile
+.editorconfig
+.pre-commit-config.yaml
+HANDOFF.md
+NEEDS-INPUT.md

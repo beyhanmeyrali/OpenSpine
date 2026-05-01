@@ -114,6 +114,9 @@ Commits on `claude/review-codebase-8XRRf`, oldest first:
 - Add v0.1 development plan and three foundational ADRs
 - Apply uncontroversial doc-review fixes
 - Bootstrap the Python project (v0.1 §4.1)
+- Add HANDOFF.md for overnight session continuity
+- Wire OpenTelemetry tracing and Prometheus metrics (v0.1 §4.8)
+- Event bus contract + embedding worker skeleton (v0.1 §4.5)
 - (further commits land below this line)
 
 ## Verification cheat-sheet
