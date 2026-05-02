@@ -58,11 +58,12 @@ async def run() -> None:
     await bus.subscribe("master_data.**", handle_event, consumer=CONSUMER_NAME)
     logger.info("embedding.worker.subscribed", pattern="master_data.**")
 
-    # Keep the process alive. Real worker will use the bus's blocking consume
-    # loop; the in-memory bus delivers synchronously on publish.
+    # Keep the process alive until cancelled. Real worker will use the bus's
+    # blocking consume loop; the in-memory bus delivers synchronously on
+    # publish. The shutdown event is set by signal handlers in production.
+    shutdown = asyncio.Event()
     try:
-        while True:
-            await asyncio.sleep(60)
+        await shutdown.wait()
     except asyncio.CancelledError:
         logger.info("embedding.worker.shutdown")
         raise

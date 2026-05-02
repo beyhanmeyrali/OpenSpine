@@ -16,18 +16,15 @@ v0.1 blocker tracked in the v0.1-foundation plan §6.
 
 from __future__ import annotations
 
-import asyncio
 import inspect
 from collections import defaultdict
-from collections.abc import Awaitable, Callable
-from typing import Any, ParamSpec, TypeVar
+from collections.abc import Callable
+from typing import Any
 
 import structlog
 
 logger = structlog.get_logger(__name__)
 
-P = ParamSpec("P")
-R = TypeVar("R")
 HookHandler = Callable[..., Any]
 
 _pre_handlers: dict[str, list[HookHandler]] = defaultdict(list)
@@ -43,7 +40,11 @@ def hook(name: str, *, async_: bool = False) -> Callable[[HookHandler], HookHand
     """
 
     def decorator(fn: HookHandler) -> HookHandler:
-        target = _post_handlers if async_ or name.split(".", 1)[-1].startswith("post_") else _pre_handlers
+        target = (
+            _post_handlers
+            if async_ or name.split(".", 1)[-1].startswith("post_")
+            else _pre_handlers
+        )
         target[name].append(fn)
         logger.info("hook.registered", hook=name, handler=fn.__qualname__)
         return fn
@@ -104,8 +105,3 @@ __all__ = [
     "registered_hooks",
     "reset",
 ]
-
-
-# Silence the unused-import warning for asyncio (used by type checkers when
-# handlers return coroutines).
-_ = asyncio

@@ -57,9 +57,7 @@ def test_publish_skips_non_matching_subscriber() -> None:
 
     asyncio.run(bus.subscribe("master_data.bp.*", handler, consumer="t"))
     asyncio.run(
-        bus.publish(
-            Event(stream="master_data.material.created", tenant_id="t-1", payload={})
-        )
+        bus.publish(Event(stream="master_data.material.created", tenant_id="t-1", payload={}))
     )
     assert seen == []
 
@@ -110,9 +108,7 @@ def test_handler_exception_does_not_break_other_handlers() -> None:
 
 def test_published_history_visible_to_tests() -> None:
     bus = InMemoryEventBus()
-    asyncio.run(
-        bus.publish(Event(stream="x.created", tenant_id="t-1", payload={"k": "v"}))
-    )
+    asyncio.run(bus.publish(Event(stream="x.created", tenant_id="t-1", payload={"k": "v"})))
     assert len(bus.published) == 1
     assert bus.published[0].stream == "x.created"
 

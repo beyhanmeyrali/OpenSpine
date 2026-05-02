@@ -78,9 +78,9 @@ class MetricsMiddleware(BaseHTTPMiddleware):
     under `unmatched`.
     """
 
-    async def dispatch(self, request: Request, call_next: Any) -> Response:  # type: ignore[override]
+    async def dispatch(self, request: Request, call_next: Any) -> Response:
         start = time.perf_counter()
-        response = await call_next(request)
+        response: Response = await call_next(request)
         elapsed = time.perf_counter() - start
         route = request.scope.get("route")
         route_template = getattr(route, "path", None) or "unmatched"

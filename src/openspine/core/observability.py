@@ -125,9 +125,7 @@ def configure_tracing(settings: Settings) -> None:
     )
     provider = TracerProvider(resource=resource)
     try:
-        exporter = OTLPSpanExporter(
-            endpoint=settings.otel_exporter_otlp_endpoint, insecure=True
-        )
+        exporter = OTLPSpanExporter(endpoint=settings.otel_exporter_otlp_endpoint, insecure=True)
         provider.add_span_processor(BatchSpanProcessor(exporter))
     except Exception:  # pragma: no cover — best-effort in local dev
         logger.warning(

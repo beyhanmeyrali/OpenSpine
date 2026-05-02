@@ -51,5 +51,13 @@ def test_openapi_docs_advertise_module_tags() -> None:
     assert response.status_code == 200
     schema = response.json()
     tag_names = {tag["name"] for tag in schema.get("tags", [])}
-    expected = {"system", "identity", "master-data", "finance", "controlling", "materials", "production"}
+    expected = {
+        "system",
+        "identity",
+        "master-data",
+        "finance",
+        "controlling",
+        "materials",
+        "production",
+    }
     assert expected.issubset(tag_names)
