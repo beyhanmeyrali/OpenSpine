@@ -12,6 +12,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from openspine.config import get_settings
+from openspine.core.database import metadata
 
 config = context.config
 if config.config_file_name is not None:
@@ -20,9 +21,10 @@ if config.config_file_name is not None:
 settings = get_settings()
 config.set_main_option("sqlalchemy.url", settings.sync_database_url)
 
-# When the SQLAlchemy models are written (v0.1 §4.2 onwards), import the
-# declarative base here so `--autogenerate` picks them up.
-target_metadata = None
+# Models are progressively added under openspine.{identity,md,fi,co,mm,pp};
+# importing those modules registers their tables on this shared metadata.
+# Until they exist, --autogenerate sees an empty schema, which is correct.
+target_metadata = metadata
 
 
 def run_migrations_offline() -> None:
