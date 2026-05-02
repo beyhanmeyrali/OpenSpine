@@ -71,7 +71,7 @@ Update this list as work-streams move through their states.
 | § | Stream | State | Notes |
 |---|--------|-------|-------|
 | 4.1 | Bootstrap | DONE | Commit `e7d9439`. 14 tests pass. |
-| 4.2 | Identity core | PENDING-OWNER-INPUT | Schema design depends on the database-per-tenant vs shared+RLS open question (`tenancy.md` Q1). Won't proceed unattended. |
+| 4.2 | Identity core | PENDING-COUNCIL-DRAFT | Tenant isolation now locked (ADR 0005, shared+RLS only). Owner directs that strategic schema decisions go through council first (identity-expert + ai-agent-architect + solution-architect), then implementation. Defer until a future session can run the council. |
 | 4.3 | RBAC + auth-object engine | BLOCKED-ON-4.2 | Needs identity tables first. |
 | 4.4 | Master Data core | BLOCKED-ON-4.2 | Needs `tenant_id` and RLS in place first. |
 | 4.5 | Event bus + embedding pipeline | SKELETON DONE | Event envelope + EventBus protocol + InMemoryEventBus + glob pattern matcher (`*`/`**`); per-tenant Qdrant collection naming convention (`openspine__<tenant>`); embedding worker entrypoint subscribed to `master_data.**`. Real Redis/Qdrant clients deferred until integration tests can run. 41 tests pass. |
@@ -119,17 +119,28 @@ Commits on `claude/review-codebase-8XRRf`, oldest first:
 - Event bus contract + embedding worker skeleton (v0.1 §4.5)
 - Add Dockerfile and event catalogue
 - Add data-model and plugin-system architecture deep-dives
+- Surface open questions in NEEDS-INPUT.md
+- Resolve hook-naming convention (ADR 0008)
+- Lock tenant isolation to logical only (ADR 0005)
+- Resolve audit topology + FX rate reference + clean up NEEDS-INPUT
 - (further commits land below this line)
 
 ## Open questions queued
 
-See `NEEDS-INPUT.md`. Seven items. Top three blocking real work:
+See `NEEDS-INPUT.md`. Most items resolved in the morning council pass:
 
-1. Hook-naming canonical form (blocks plugin host hardening, §4.6)
-2. AGPL plugin distribution implications (ADR 0004)
-3. Audit-log topology — write the missing section in identity/README
+- Hook naming → ADR 0008
+- Audit topology → identity/README.md section written
+- Tenant isolation (DB-per-tenant + Qdrant scaling) → ADR 0005
+- FX rate `M` reference → permissions.md updated
 
-The rest are not blockers; they're queued at your convenience.
+Still open by deliberate deferral:
+
+- AGPL plugin distribution (owner deferred until adopter asks)
+- Identity §4.2 schema design (owner directed council-first; defer until
+  a future session can convene the council)
+
+The remaining open items in `tenancy.md` are post-v1.0.
 
 ## Verification cheat-sheet
 

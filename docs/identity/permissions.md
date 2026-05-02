@@ -70,7 +70,7 @@ SoD rules run **before** allowance — a SoD block overrides any allow.
 
 ## Currency in amount qualifiers
 
-Amount qualifiers are always stored in a specified reference currency (Company Code local currency by default, with explicit currency as metadata). At check time, the amount under test is converted to the reference currency using the current mid-rate. Conversion results are logged so audit can reproduce the decision.
+Amount qualifiers are always stored in a specified reference currency (Company Code local currency by default, with explicit currency as metadata). At check time, the amount under test is converted to the reference currency using the current `M` (average) exchange rate from `md_fx_rate`. Authorisation conversions always use rate type `M` — never `B` (bank-selling) or `G` (bank-buying) — to avoid directional bias in permission checks. Conversion results are logged so audit can reproduce the decision.
 
 ## Denial semantics
 
