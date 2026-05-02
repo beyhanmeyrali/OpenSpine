@@ -12,9 +12,15 @@ Thank you for looking. OpenSpine is pre-alpha, community-driven, and deliberatel
 
 ## How to start
 
-1. **Read the docs.** Start with [README.md](./README.md) and [ARCHITECTURE.md](./ARCHITECTURE.md), then browse [`docs/`](./docs/).
+1. **Read the docs.** Start with [README.md](./README.md) and [ARCHITECTURE.md](./ARCHITECTURE.md), then browse [`docs/`](./docs/). For the current development plan, see [`docs/roadmap/v0.1-foundation.md`](./docs/roadmap/v0.1-foundation.md).
 2. **Open an issue before large work.** For anything beyond a typo fix or clarification, open a GitHub issue describing the change you want to make. This avoids wasted effort and gets the design validated first.
 3. **Keep PRs small and focused.** One concern per PR. Document the *why* in the PR description.
+4. **Set up locally.** See [`docs/architecture/development.md`](./docs/architecture/development.md) for the full setup. Short version: `make dev` (creates venv, installs deps, installs pre-commit), then `make up` (starts Postgres / Redis / Qdrant / Ollama via Docker Compose).
+5. **Run the CI gauntlet locally before pushing.** CI runs ruff lint, ruff format check, mypy, and pytest. `make check` runs all four. Pushing without it wastes CI minutes and reviewer time.
+
+## Council pattern (advanced)
+
+For cross-module work, OpenSpine ships a council of project-scoped Claude Code subagents under `.claude/agents/` (`md-expert`, `fico-expert`, `mm-expert`, `pp-expert`, `identity-expert`, `ai-agent-architect`, `plugin-architect`, `solution-architect`). The orchestrator instructions in [`CLAUDE.md`](./CLAUDE.md) route prompts to the right expert and convene a council for cross-module concerns. Use it when designing changes that span modules — the experts encode the doc-grounded knowledge for their domain.
 
 ## Contribution licensing
 
