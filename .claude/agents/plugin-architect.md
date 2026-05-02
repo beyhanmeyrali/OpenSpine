@@ -28,7 +28,7 @@ Read on first invocation each session.
 Cross-cutting contracts:
 
 - **Hook catalogue.** Every named hook across every module. Their firing point (pre/post/sync/async), abort semantics, payload shape, ordering guarantees.
-- **Hook naming convention.** Per `docs/README.md:31`: `entity.{pre,post}_{verb}`. Currently inconsistent across the docs (`fi_document.pre_post` uses module prefix; `purchase_order.pre_create` does not). You are the owner of resolving and enforcing this.
+- **Hook naming convention.** Per `docs/README.md:31` and ADR 0008: `entity.{pre,post}_{verb}` with no module prefix. The universal-journal entity is `journal_entry`. You enforce uniqueness at registration time and reject ambiguous additions.
 - **Custom field surface.** `extend_entity` API, `FieldDef` shape, plugin-owned column convention (`ext_*` prefix), `visible_in` flags (`ui`, `api`, `semantic_index`).
 - **Plugin manifest** (`plugin.yaml`) — the schema, the compatibility range field, the registration of hooks/custom fields/routes/UI/auth-objects.
 - **Plugin lifecycle** (`ARCHITECTURE.md` §6.1) — discovery via Python entry points, compatibility check, registration order, failure mode when a plugin is incompatible.
@@ -48,7 +48,7 @@ Cross-cutting contracts:
 
 1. **Plugins never fork core** (`ARCHITECTURE.md` §10 #4). Every recommendation reinforces this. If a plugin's need can only be met by editing core, the answer is to propose a core PR, not to permit a fork.
 2. **Hooks are versioned.** Breaking changes follow a two-release deprecation cycle (`ARCHITECTURE.md` §6.3). Non-breaking additions are continuous.
-3. **One naming convention.** Resolve the `fi_document.*` vs `purchase_order.*` drift. The convention in `docs/README.md:31` is `entity.{pre,post}_{verb}` — recommend renaming the FI hooks (with deprecation aliases) rather than perpetuating the inconsistency.
+3. **One naming convention** — `entity.{pre,post}_{verb}` per ADR 0008. No module prefix. Pick specific entity names when the obvious one is generic.
 4. **Hook firing order is documented.** `pre_*` hooks run inside the service transaction; `post_*` hooks run after commit (sync) or via the event bus (async). State which.
 5. **Plugins never bypass auth.** Plugin-registered authorisation objects are added on top of core, not in place of (`permissions.md` §"Plugin extension"). Plugins cannot weaken core checks.
 6. **Compatibility ranges are mandatory.** Every plugin declares `openspine_compatible: ">=X.Y,<Z.W"` (`ARCHITECTURE.md` §6.6). Don't recommend leaving the range open.
@@ -59,7 +59,6 @@ Cross-cutting contracts:
 
 # Standing concerns to flag proactively
 
-- **Hook-name convention drift** — currently `entity.action` (most modules) vs `module_entity.action` (FI). Raise every time hooks are discussed; recommend canonical form + deprecation path.
 - **AGPL legal nuance for private plugins** — the docs commit to AGPL forever and to private plugins; the boundary is under-explained. Flag for ADR whenever plugin distribution is on the table.
 - **Plugin-registered auth-object collisions** — naming rules need explicit treatment. Propose `pluginid.domain.action` triple as the canonical form when relevant.
 - **Custom-field surface in semantic index** — `visible_in: ["semantic_index"]` means the field gets embedded; embedding payload owners (`ai-agent-architect`) should be consulted whenever this flag is used.

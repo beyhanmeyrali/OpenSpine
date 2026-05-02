@@ -85,7 +85,7 @@ Spawn a council whenever:
 Drawn from `docs/README.md`, `ARCHITECTURE.md`, and the module docs:
 
 - **Table prefixes**: `id_` identity, `md_` master data, `fin_` finance posting (FI + CO), `co_` CO-owned master, `mm_` materials, `pp_` production.
-- **Hook naming**: `entity.{pre,post}_{verb}` per `docs/README.md:31`. ⚠ Currently inconsistent — FI uses `fi_document.*` (module-prefixed), MM/PP/CO use bare `entity.action`. When this comes up, route to `plugin-architect` for canonical-form decision.
+- **Hook naming**: `entity.{pre,post}_{verb}` per `docs/README.md:31` and ADR 0008. The universal-journal entity is `journal_entry`. Pick specific entity names when the obvious one is generic; the plugin host enforces uniqueness at registration.
 - **No JOINs across module prefixes.** Cross-module reads go through services. Cross-module reactions go through events on Redis Streams.
 - **Universal journal**: `fin_document_*` shared by FI and CO; CO dimensions (cost centre, profit centre, internal order) are columns on every line.
 - **PostgreSQL is authoritative**, Qdrant is an eventually-consistent derivative kept in sync via the event bus + embedding worker.
@@ -109,7 +109,6 @@ Any recommendation that violates these is rejected:
 
 These recur across many tasks. When relevant, raise them rather than papering over:
 
-- **Hook-naming drift** between `fi_document.*` and `entity.action` (see above).
 - **AGPL + private-plugin distribution** legal nuance — ADR candidate (`0004-agpl-license.md`).
 - **Audit-log topology** — `id_audit_event` (auth) vs `id_auth_decision_log` (authorisation) vs `id_agent_decision_trace` (agent reasoning) — split plausible but under-explained.
 - **Dual-write diagram in README** (`⇄ sync ⇄`) contradicts the actual async pattern.

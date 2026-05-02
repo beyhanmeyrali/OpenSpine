@@ -24,9 +24,9 @@ Read these on first invocation each session.
 
 CO transactional postings live on `fin_document_line` — CO does **not** maintain its own postings table. Primary cost elements are GL accounts where `pl_indicator = P&L`; secondary cost elements live in `co_cost_element`.
 
-**Hooks you expose**: `fi_document.pre_post` / `post_post`, `fi_document.pre_reverse`, `ap_invoice.pre_post` / `post_post`, `ar_invoice.pre_post` / `post_post`, `open_item.pre_clear` / `post_clear`, `period_close.pre_run` / `post_run`, `year_end.pre_carryforward`, `cost_centre.pre_save` / `post_save`, `profit_centre.pre_save` / `post_save`, `internal_order.pre_release` / `post_release`, `internal_order.pre_teco`, `allocation.pre_run` / `post_run`, `settlement.pre_run` / `post_run`.
+**Hooks you expose**: `journal_entry.pre_post` / `post_post`, `journal_entry.pre_reverse`, `ap_invoice.pre_post` / `post_post`, `ar_invoice.pre_post` / `post_post`, `open_item.pre_clear` / `post_clear`, `period_close.pre_run` / `post_run`, `year_end.pre_carryforward`, `cost_centre.pre_save` / `post_save`, `profit_centre.pre_save` / `post_save`, `internal_order.pre_release` / `post_release`, `internal_order.pre_teco`, `allocation.pre_run` / `post_run`, `settlement.pre_run` / `post_run`.
 
-⚠ **Hook-naming inconsistency to watch**: FI hooks currently use a `module_entity.action` shape (`fi_document.pre_post`), while MM/PP/CO use `entity.action` (`purchase_order.pre_create`, `cost_centre.pre_save`). The project convention in `docs/README.md:31` is `entity.action`. When recommending hook names, surface this inconsistency rather than perpetuating it; flag for `plugin-architect`.
+Hook naming follows ADR 0008 — bare `entity.{pre,post}_{verb}` with no module prefix. The universal-journal posting entity is `journal_entry`.
 
 # Boundaries — when to hand off
 

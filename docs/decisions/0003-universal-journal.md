@@ -55,11 +55,11 @@ Concretely:
 
 1. **Authorisation.** A user with FI permissions can post entries that *also* affect CO (because the cost centre column is on the same row). Authorisation objects live on the action (`fi.document.post`), with CO scope qualifiers (`controlling_area`, `cost_centre_range`) on the same auth check. This is captured in `permissions.md`.
 
-2. **Hooks.** There is no separate "CO posting" hook; `fi_document.pre_post` and its siblings cover everything. CO-specific behaviours (allocation execution, settlement) have their own hooks (`allocation.pre_run`, `settlement.pre_run`) that *trigger* universal-journal writes via the FI posting service, never bypass it.
+2. **Hooks.** There is no separate "CO posting" hook; `journal_entry.pre_post` and its siblings (per ADR 0008's naming convention) cover everything. CO-specific behaviours (allocation execution, settlement) have their own hooks (`allocation.pre_run`, `settlement.pre_run`) that *trigger* universal-journal writes via the FI posting service, never bypass it.
 
 3. **Module boundaries.** CO calls FI's posting service; FI does not call CO. The CO master tables are read by FI when validating a posting's cost-object assignments, but FI does not write CO master.
 
-4. **Hook naming consistency.** This ADR notes that the FI hooks currently use a `module_entity.action` shape (`fi_document.pre_post`) inconsistent with the rest of the project's `entity.action` convention (`docs/README.md:31`). Resolution is tracked separately in v0.1; this ADR doesn't fix it but doesn't introduce more drift.
+4. **Hook naming consistency.** Resolved by ADR 0008 — FI hooks use `entity.action` like every other module, with `journal_entry` as the universal-journal entity name. This ADR's references to `journal_entry.pre_post` etc. follow that convention.
 
 5. **Multi-currency, parallel ledgers.** The universal journal carries local / document / group / hard currency columns and a `ledger_group` column per line. Parallel ledgers (e.g., `0L` leading IFRS, `2L` local GAAP) are rows in a different ledger group, not a different table. Default deployment is one ledger; additional ledgers are opt-in at Company Code level (`fi-finance.md` open Q1).
 

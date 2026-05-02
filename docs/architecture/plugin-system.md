@@ -4,10 +4,11 @@ Deep-dive on how OpenSpine plugins are discovered, registered, isolated, and
 upgraded. The high-level overview is in `ARCHITECTURE.md` §6; this doc covers
 the operational reality.
 
-> **Hook-naming convention** — the canonical form across modules is being
-> reconciled (see v0.1-foundation.md §6 and §7.1). This doc does not yet
-> commit to a single convention. The hook surface itself is described in
-> `ARCHITECTURE.md` §6.3 and the per-module §7 sections.
+> **Hook-naming convention** — `entity.{pre,post}_{verb}` per ADR 0008.
+> No module prefix. Pick specific entity names when the obvious one is
+> generic (e.g., `journal_entry` rather than `document` for FI). The
+> plugin host enforces uniqueness at registration. Hook surface itself
+> is described in `ARCHITECTURE.md` §6.3 and the per-module §7 sections.
 
 ## Goals (and non-goals)
 

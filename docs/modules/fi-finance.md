@@ -53,7 +53,7 @@ Tables use the `fin_` prefix. FI and CO share the posting tables — CO dimensio
 
 ## 5. Key transactions / business processes
 
-- **Post GL document.** Direct journal entry. Validates balanced per currency per ledger, validates period open, runs `fi_document.pre_post` hooks, commits, runs `fi_document.post_post` hooks.
+- **Post GL document.** Direct journal entry. Validates balanced per currency per ledger, validates period open, runs `journal_entry.pre_post` hooks, commits, runs `journal_entry.post_post` hooks.
 - **Post vendor invoice (AP).** Creates payable in `fin_document_line` against reconciliation account of the vendor's BP, generates tax lines, creates open item.
 - **Post customer invoice (AR).** Mirror of AP.
 - **Clear open items.** Match one or many open items against a clearing document (typically a payment). Partial clearing supported.
@@ -86,12 +86,14 @@ Tables use the `fin_` prefix. FI and CO share the posting tables — CO dimensio
 
 ## 7. Hook points exposed
 
+Hook names follow the canonical `entity.{pre,post}_{verb}` form (ADR 0008). The universal-journal posting entity is `journal_entry`.
+
 | Hook | Fires | Can abort? |
 |------|-------|------------|
-| `fi_document.pre_post` | Before the document posting transaction commits | Yes |
-| `fi_document.post_post` | After commit | No (async) |
-| `fi_document.pre_reverse` | Before reversal | Yes |
-| `ap_invoice.pre_post` | Before AP invoice commits (runs after `fi_document.pre_post`) | Yes |
+| `journal_entry.pre_post` | Before the document posting transaction commits | Yes |
+| `journal_entry.post_post` | After commit | No (async) |
+| `journal_entry.pre_reverse` | Before reversal | Yes |
+| `ap_invoice.pre_post` | Before AP invoice commits (runs after `journal_entry.pre_post`) | Yes |
 | `ap_invoice.post_post` | After AP invoice committed | No |
 | `ar_invoice.pre_post` | Before AR invoice commits | Yes |
 | `ar_invoice.post_post` | After AR invoice committed | No |

@@ -106,7 +106,7 @@ Tables use the `mm_` prefix.
 | `purchase_order.post_release` | After release | No |
 | `goods_receipt.pre_post` | Before GR posting commits | Yes |
 | `goods_receipt.post_post` | After GR posted | No |
-| `invoice_receipt.pre_post` | Before IR posting commits (after `fi_document.pre_post`) | Yes |
+| `invoice_receipt.pre_post` | Before IR posting commits (after `journal_entry.pre_post`) | Yes |
 | `invoice_receipt.post_post` | After IR posted | No |
 | `invoice_receipt.pre_block` | Before IR is blocked for tolerance | Yes |
 | `stock.pre_movement` | Before any movement posts | Yes |

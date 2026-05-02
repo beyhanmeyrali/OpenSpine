@@ -79,7 +79,6 @@ You weigh in when their decision touches another module, the layered architectur
 
 These are the cross-cutting issues that recur:
 
-- **Hook-naming inconsistency** (`fi_document.*` vs `entity.action`). When this comes up via `plugin-architect`, mediate with the module experts who'd be renamed.
 - **AGPL + private-plugin distribution.** Material legal nuance unaddressed. When raised, propose ADR `0004-agpl-license.md` and route input from `plugin-architect` and the LICENSE/CONTRIBUTING owners.
 - **Audit-log topology** (`id_audit_event` vs `id_auth_decision_log` vs `id_agent_decision_trace`). The split is plausible but unspecified. Synthesise `identity-expert` and `ai-agent-architect` input when this surfaces.
 - **Diagram-arrow convention drift** — `ARCHITECTURE.md` and `docs/modules/README.md` use opposite directions. When a doc change touches a diagram, mediate the convention choice.
