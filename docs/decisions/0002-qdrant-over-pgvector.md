@@ -64,12 +64,11 @@ We choose Option B because:
 
 ## Multi-tenant collection topology
 
-Open within this decision: collection-per-tenant vs shared collection with tenant-keyed payload filter. v0.1 ships with **collection-per-tenant** for hard isolation. We revisit when:
+**Collection-per-tenant. Forever.** This is the architectural commitment, not a "revisit at scale" hedge. See ADR 0005 for the broader tenant-isolation stance: OpenSpine commits to logical isolation only, and the typical deployment is single-tenant per installation — which makes "scale to many tenants per Qdrant cluster" a SaaS-hoster problem rather than a core-architecture problem.
 
-- Tenant count crosses ~500 in a single deployment (Qdrant collection management overhead becomes meaningful), or
-- A pilot finds the per-collection overhead empirically too high.
+Naming convention: `openspine__<tenant_id>` (lowercase). Implemented in `src/openspine/core/qdrant.py`.
 
-If we move to shared+filter, that's a new ADR that supersedes the topology section here, not this whole decision.
+Hosters who run OpenSpine multi-tenant at large scale (hundreds or thousands of tenants per installation) will hit operational ceilings on collection-per-tenant Qdrant. Solving that is their operational concern; the architecture won't be revisited to weaken isolation under their load.
 
 ## Consequences
 

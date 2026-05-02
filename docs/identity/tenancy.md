@@ -66,8 +66,19 @@ See [roles.md](./roles.md) and [permissions.md](./permissions.md) for how this s
 
 Organisational units proper (Company Code, Controlling Area, Plant, etc.) live in Master Data (`md_*`) because they are business objects — but identity uses them as authorisation scopes.
 
+## Deployment model
+
+Per ADR 0005, the **default deployment is single-tenant per installation.** Each adopting company runs their own OpenSpine — own Postgres, own Qdrant, own Redis, own embedding worker. The multi-tenant architecture exists so that a third party who chooses to host OpenSpine as cloud SaaS can serve multiple customer tenants from one installation; that hosting choice is opt-in and external to the project.
+
+Self-hosting therefore runs one tenant in a multi-tenant-shaped schema. The architecture is the same in both deployments — logical isolation through RLS + service-layer filter + per-tenant Qdrant collection — and the same code path serves both.
+
+## Non-negotiable: logical isolation only
+
+OpenSpine **does not** support database-per-tenant deployments. Tenant isolation is logical (shared schema + RLS + service-layer filter + per-tenant Qdrant collection), and that is the only model. Adopters whose regulator demands physical isolation should run OpenSpine self-hosted — the database is physically theirs by virtue of being on their own server, and there is one tenant in it.
+
+Captured in ADR 0005.
+
 ## Open questions
 
-1. **Database-per-tenant vs shared schema?** Default: shared schema with RLS. For regulated workloads, a plugin / deployment variant may want database-per-tenant — cleaner isolation, harder ops. Revisit.
-2. **Cross-tenant consolidation.** Group-level reporting across tenants (e.g. a holding company with per-entity tenants) — how? Probably a separate reporting tenant that pulls from source tenants via authorised read-only APIs. Not Phase 1.
-3. **Tenant move.** Exporting and re-importing a tenant cleanly — needs a structured export format. Post-v1.0.
+1. **Cross-tenant consolidation.** Group-level reporting across tenants (e.g. a holding company with per-entity tenants) — how? Probably a separate reporting tenant that pulls from source tenants via authorised read-only APIs. Not Phase 1.
+2. **Tenant move.** Exporting and re-importing a tenant cleanly — needs a structured export format. Post-v1.0.
