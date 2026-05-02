@@ -144,9 +144,17 @@ The remaining open items in `tenancy.md` are post-v1.0.
 
 ## Verification cheat-sheet
 
+Run the full CI gauntlet locally before any code-touching push. Pytest
+alone is not enough — ruff lint, ruff format check, and mypy all run in
+CI and any of them can fail the job:
+
 ```bash
-git log --oneline -20
-PYTHONPATH=src python3 -m pytest tests/ -v
-ruff check src tests        # if ruff is installed
-mypy src                    # if mypy is installed
+ruff check src tests             # lint
+ruff format --check src tests    # format
+PYTHONPATH=src mypy src          # types
+PYTHONPATH=src pytest tests/ -q  # tests
+git log --oneline -20            # recent commits
 ```
+
+`make check` runs lint + typecheck + test once the project venv is
+installed via `make dev`.
