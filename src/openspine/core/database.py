@@ -28,12 +28,7 @@ from typing import Any
 
 from sqlalchemy import DateTime, ForeignKey, Integer, MetaData, func, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.orm import (
-    DeclarativeBase,
-    Mapped,
-    declared_attr,
-    mapped_column,
-)
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 # Naming convention for indexes, constraints, and foreign keys.
 #
@@ -63,6 +58,10 @@ class Base(DeclarativeBase):
 
 
 # ---- Mixins ----------------------------------------------------------------
+#
+# Mixins use plain `mapped_column` with string ForeignKey references. The
+# strings are resolved by SQLAlchemy at metadata-load time, so we don't need
+# `@declared_attr` complexity to defer the resolution.
 
 
 class _UUIDPrimaryKeyMixin:
@@ -87,11 +86,9 @@ class _AuditColumnsMixin:
     `version` are touched by a `BEFORE UPDATE` trigger that the migration
     accompanying the first concrete table installs once at first use.
 
-    `created_by` and `updated_by` are FKs to `id_principal(id)`. Since this
-    mixin is used by tables in many modules and Python class-resolution
-    order in SQLAlchemy can't see the principal table from here, we declare
-    the column with the foreign-key string form; SQLAlchemy resolves it at
-    metadata-load time.
+    `created_by` and `updated_by` reference `id_principal(id)` via string
+    FK; SQLAlchemy resolves the reference at metadata-load time, so we
+    don't need to import the principal table here.
     """
 
     created_at: Mapped[datetime] = mapped_column(
@@ -99,31 +96,21 @@ class _AuditColumnsMixin:
         nullable=False,
         server_default=func.now(),
     )
-
-    @declared_attr
-    @classmethod
-    def created_by(cls) -> Mapped[uuid.UUID]:
-        return mapped_column(
-            PG_UUID(as_uuid=True),
-            ForeignKey("id_principal.id"),
-            nullable=False,
-        )
-
+    created_by: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("id_principal.id"),
+        nullable=False,
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
     )
-
-    @declared_attr
-    @classmethod
-    def updated_by(cls) -> Mapped[uuid.UUID]:
-        return mapped_column(
-            PG_UUID(as_uuid=True),
-            ForeignKey("id_principal.id"),
-            nullable=False,
-        )
-
+    updated_by: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("id_principal.id"),
+        nullable=False,
+    )
     version: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
@@ -139,15 +126,12 @@ class _TenantColumnMixin:
     reference this column.
     """
 
-    @declared_attr
-    @classmethod
-    def tenant_id(cls) -> Mapped[uuid.UUID]:
-        return mapped_column(
-            PG_UUID(as_uuid=True),
-            ForeignKey("id_tenant.id"),
-            nullable=False,
-            index=True,
-        )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("id_tenant.id"),
+        nullable=False,
+        index=True,
+    )
 
 
 # ---- Public mixin types ----------------------------------------------------
