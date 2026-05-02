@@ -71,12 +71,12 @@ Update this list as work-streams move through their states.
 | § | Stream | State | Notes |
 |---|--------|-------|-------|
 | 4.1 | Bootstrap | DONE | Commit `e7d9439`. 14 tests pass. |
-| 4.2 | Identity core | PENDING-COUNCIL-DRAFT | Tenant isolation now locked (ADR 0005, shared+RLS only). Owner directs that strategic schema decisions go through council first (identity-expert + ai-agent-architect + solution-architect), then implementation. Defer until a future session can run the council. |
+| 4.2 | Identity core | PENDING-COUNCIL-DRAFT | Tenant isolation locked (ADR 0005, shared+RLS only). Mechanical scaffolding now in place: SQLAlchemy declarative Base + AuditMixin + BusinessTableMixin per docs/architecture/data-model.md (commit cb1ad97). Strategic decisions (column types per entity, RLS policy shape, audit-trigger pattern, agent-token shape) reserved for the council per owner direction. |
 | 4.3 | RBAC + auth-object engine | BLOCKED-ON-4.2 | Needs identity tables first. |
 | 4.4 | Master Data core | BLOCKED-ON-4.2 | Needs `tenant_id` and RLS in place first. |
 | 4.5 | Event bus + embedding pipeline | SKELETON DONE | Event envelope + EventBus protocol + InMemoryEventBus + glob pattern matcher (`*`/`**`); per-tenant Qdrant collection naming convention (`openspine__<tenant>`); embedding worker entrypoint subscribed to `master_data.**`. Real Redis/Qdrant clients deferred until integration tests can run. 41 tests pass. |
-| 4.6 | Plugin host | SKELETON DONE | core/plugins.py: discovery via Python entry points (group `openspine.plugins`), pydantic-validated PluginManifest (strict, extra=forbid), PEP 440 compatibility check (mandatory range), three-state lifecycle (`loaded` / `skipped_incompatible` / `failed`), per-plugin record with reason. Loaded on app startup. `/system/plugins` exposes the registry to operators and agents. examples/openspine-plugin-example/ ships a reference plugin demonstrating all four extension mechanisms. Custom-field column generation, route mounting, and auth-object registration are accepted in the manifest but defer to §4.4/§4.3 for activation. 59 tests pass. |
-| 4.7 | Agent surface | BLOCKED-ON-4.2/4.4/4.5 | |
+| 4.6 | Plugin host | DONE (subject to §4.3/§4.4 wiring) | Discovery via Python entry points; pydantic-validated PluginManifest; PEP 440 compatibility check; three-state lifecycle; per-plugin record. Routes from manifest mounted on FastAPI app at startup. `/system/plugins` reports state. Example plugin in examples/openspine-plugin-example/. CI integration job installs core + example, runs `pytest -m integration` to verify the full discovery → manifest → hook → route pipeline. Auth-object registration and custom-field column generation are accepted in the manifest now and activate when §4.3 / §4.4 land. 67 tests pass. |
+| 4.7 | Agent surface | PARTIAL | Structured-error envelope done (core/errors.py + main.py exception handler — denial semantics ready for agent self-correction). Remaining pieces (`_meta` block on responses, agent-token shape, agent-decision-trace, hybrid /md/search) wait on §4.2 and §4.4. |
 | 4.8 | Observability | DONE | OTel tracing scaffolded with FastAPI auto-instrumentation; Prometheus `/metrics` endpoint; `MetricsMiddleware` records request count + latency by (method, route, status); domain-shaped counters/histograms (events, embedding lag, auth decisions, hook dispatch) registered. 18 tests pass. |
 
 ## Open questions accumulating for owner review
@@ -126,6 +126,10 @@ Commits on `claude/review-codebase-8XRRf`, oldest first:
 - Fix CI failures: ruff lint + format + mypy
 - Update HANDOFF verification cheat-sheet to match CI
 - Plugin host skeleton + reference example (v0.1 §4.6)
+- Mount plugin-declared routes on app startup
+- Add CI integration job that proves the example plugin works end-to-end
+- Add CHANGELOG.md, refresh CONTRIBUTING, add example-plugin tests
+- SQLAlchemy declarative base + audit/tenant mixins
 - (further commits land below this line)
 
 ## Open questions queued
