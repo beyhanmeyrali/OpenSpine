@@ -46,7 +46,7 @@ async def lifespan(app: FastAPI) -> Any:
     configure_logging(settings.log_level)
     configure_tracing(settings)
     instrument_app(app)
-    plugins = load_plugins()
+    plugins = load_plugins(app=app)
     logger.info(
         "openspine.startup",
         version=__version__,

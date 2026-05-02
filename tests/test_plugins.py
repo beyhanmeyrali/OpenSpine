@@ -178,3 +178,80 @@ def test_record_appears_in_registry() -> None:
     assert len(plugins.loaded_plugins()) == 1
     assert plugins.loaded_plugins()[0].plugin_id == "t"
     assert plugins.loaded_plugins()[0].state == "failed"
+
+
+# ---- Route mounting -------------------------------------------------------
+
+
+def test_mount_plugin_routes_serves_request(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pkg_dir = tmp_path / "fakerouterpkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text("")
+    (pkg_dir / "endpoints.py").write_text(
+        textwrap.dedent(
+            """
+            from fastapi import APIRouter
+
+            router = APIRouter()
+
+            @router.get("/greet")
+            async def greet() -> dict[str, str]:
+                return {"message": "hi"}
+            """
+        )
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    manifest = plugins.parse_manifest(
+        textwrap.dedent(
+            """
+            name: fakerouterpkg
+            version: 1.0.0
+            openspine_compatible: ">=0.1.0.dev0,<2.0"
+            routes:
+              - prefix: /fakerouterpkg
+                module: fakerouterpkg.endpoints
+            """
+        )
+    )
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    app = FastAPI()
+    plugins.mount_plugin_routes(app, manifest)
+
+    with TestClient(app) as client:
+        response = client.get("/fakerouterpkg/greet")
+    assert response.status_code == 200
+    assert response.json() == {"message": "hi"}
+
+
+def test_mount_plugin_routes_raises_when_router_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pkg_dir = tmp_path / "noroutermodule"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text("")
+    (pkg_dir / "endpoints.py").write_text("# no router exposed\n")
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    manifest = plugins.parse_manifest(
+        textwrap.dedent(
+            """
+            name: noroutermodule
+            version: 1.0.0
+            openspine_compatible: ">=0.1.0.dev0,<2.0"
+            routes:
+              - prefix: /x
+                module: noroutermodule.endpoints
+            """
+        )
+    )
+
+    from fastapi import FastAPI
+
+    with pytest.raises(AttributeError, match="does not expose 'router'"):
+        plugins.mount_plugin_routes(FastAPI(), manifest)

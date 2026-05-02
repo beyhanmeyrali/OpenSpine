@@ -25,7 +25,7 @@ import importlib.metadata as md
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import structlog
 import yaml
@@ -187,8 +187,13 @@ def discover() -> list[md.EntryPoint]:
     return list(md.entry_points().select(group=ENTRY_POINT_GROUP))
 
 
-def load_all() -> list[Plugin]:
+def load_all(app: Any | None = None) -> list[Plugin]:
     """Discover, validate, and register every advertised plugin.
+
+    If `app` is provided (a FastAPI instance), route declarations from each
+    successfully-loaded plugin's manifest are mounted on it under the
+    declared prefix. Without `app`, manifests are still parsed and hooks
+    still imported — only route mounting is skipped (useful in tests).
 
     Idempotent within a process: re-calling does not re-register a plugin
     that's already loaded; failures from a previous call are retained so
@@ -197,11 +202,11 @@ def load_all() -> list[Plugin]:
     for entry in discover():
         if entry.name in _plugins:
             continue
-        _load_one(entry)
+        _load_one(entry, app=app)
     return list(_plugins.values())
 
 
-def _load_one(entry: md.EntryPoint) -> Plugin:
+def _load_one(entry: md.EntryPoint, *, app: Any | None = None) -> Plugin:
     plugin_id = entry.name
     package = entry.value.split(":", 1)[0] or entry.value
     try:
@@ -243,7 +248,42 @@ def _load_one(entry: md.EntryPoint) -> Plugin:
             f"hook import failed: {exc}",
         )
 
+    # Mount routes if an app was provided. Failures mark the plugin failed
+    # and skip remaining routes; successfully-mounted routes from this
+    # plugin remain in the app's router (Starlette has no clean unmount).
+    if app is not None:
+        try:
+            mount_plugin_routes(app, manifest)
+        except Exception as exc:
+            return _record(
+                plugin_id,
+                package,
+                manifest,
+                "failed",
+                f"route mount failed: {exc}",
+            )
+
     return _record(plugin_id, package, manifest, "loaded", None)
+
+
+def mount_plugin_routes(app: Any, manifest: PluginManifest) -> None:
+    """Mount every route declared in the manifest onto `app`.
+
+    Each route declaration names a Python module that must expose a
+    FastAPI `APIRouter` named `router`. The router is mounted at the
+    declared prefix.
+
+    Raises if any route fails to mount; the caller decides what to do.
+    """
+    for route_decl in manifest.routes:
+        module = importlib.import_module(route_decl.module)
+        router = getattr(module, "router", None)
+        if router is None:
+            raise AttributeError(
+                f"Module {route_decl.module!r} does not expose 'router' "
+                f"(declared by plugin route {route_decl.prefix!r})"
+            )
+        app.include_router(router, prefix=route_decl.prefix)
 
 
 def _record(
@@ -285,6 +325,7 @@ __all__ = [
     "load_all",
     "load_manifest_from_package",
     "loaded_plugins",
+    "mount_plugin_routes",
     "parse_manifest",
     "reset",
 ]
