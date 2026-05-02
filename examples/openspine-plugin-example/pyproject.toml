@@ -9,9 +9,11 @@ description = "Reference plugin demonstrating every OpenSpine extension mechanis
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "AGPL-3.0-or-later" }
-dependencies = [
-    "openspine>=0.1.0.dev0",
-]
+# openspine is the host that loads this plugin. We don't pin it as a hard
+# dependency because OpenSpine isn't published to PyPI yet — install it
+# alongside this plugin (e.g. `pip install -e .` from the OpenSpine repo
+# root, then `pip install -e examples/openspine-plugin-example/`).
+dependencies = []
 
 [project.entry-points."openspine.plugins"]
 example = "openspine_plugin_example"
