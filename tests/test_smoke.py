@@ -45,6 +45,17 @@ def test_hooks_endpoint_returns_registry_shape() -> None:
     assert set(body.keys()) == {"pre", "post"}
 
 
+def test_plugins_endpoint_returns_list() -> None:
+    with TestClient(app) as client:
+        response = client.get("/system/plugins")
+    assert response.status_code == 200
+    body = response.json()
+    assert isinstance(body, list)
+    # Shape check: each entry has the documented fields
+    for entry in body:
+        assert {"plugin_id", "package", "state", "loaded_at"} <= set(entry.keys())
+
+
 def test_openapi_docs_advertise_module_tags() -> None:
     with TestClient(app) as client:
         response = client.get("/openapi.json")

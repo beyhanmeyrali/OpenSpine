@@ -34,6 +34,8 @@ from openspine.core.observability import (
     instrument_app,
     metrics_response_body,
 )
+from openspine.core.plugins import load_all as load_plugins
+from openspine.core.plugins import loaded_plugins
 
 logger = structlog.get_logger(__name__)
 
@@ -44,7 +46,14 @@ async def lifespan(app: FastAPI) -> Any:
     configure_logging(settings.log_level)
     configure_tracing(settings)
     instrument_app(app)
-    logger.info("openspine.startup", version=__version__, env=settings.env)
+    plugins = load_plugins()
+    logger.info(
+        "openspine.startup",
+        version=__version__,
+        env=settings.env,
+        plugins_total=len(plugins),
+        plugins_loaded=sum(1 for p in plugins if p.state == "loaded"),
+    )
     yield
     logger.info("openspine.shutdown")
 
@@ -146,6 +155,35 @@ async def list_hooks() -> dict[str, dict[str, int]]:
     the available extension surface.
     """
     return registered_hooks()
+
+
+@app.get("/system/plugins", tags=["system"])
+async def list_plugins() -> list[dict[str, Any]]:
+    """Plugins known to the host — loaded, skipped, or failed.
+
+    Useful for operators verifying a deployment, and for agents that want
+    to discover what extension surface a tenant has installed.
+    """
+    out: list[dict[str, Any]] = []
+    for p in loaded_plugins():
+        out.append(
+            {
+                "plugin_id": p.plugin_id,
+                "package": p.package,
+                "state": p.state,
+                "reason": p.reason,
+                "loaded_at": p.loaded_at.isoformat(),
+                "version": p.manifest.version if p.manifest else None,
+                "openspine_compatible": (p.manifest.openspine_compatible if p.manifest else None),
+                "hooks": ([h.name for h in p.manifest.hooks] if p.manifest else []),
+                "custom_fields": (
+                    [f"{f.entity}.{f.field}" for f in p.manifest.custom_fields]
+                    if p.manifest
+                    else []
+                ),
+            }
+        )
+    return out
 
 
 @app.get("/metrics", tags=["system"], include_in_schema=False)

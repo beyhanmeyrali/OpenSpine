@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "openspine-plugin-example"
+version = "0.1.0"
+description = "Reference plugin demonstrating every OpenSpine extension mechanism."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "AGPL-3.0-or-later" }
+dependencies = [
+    "openspine>=0.1.0.dev0",
+]
+
+[project.entry-points."openspine.plugins"]
+example = "openspine_plugin_example"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/openspine_plugin_example"]
+include = ["src/openspine_plugin_example/plugin.yaml"]

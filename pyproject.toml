@@ -44,6 +44,8 @@ dependencies = [
     "opentelemetry-instrumentation-fastapi>=0.49b0",
     "opentelemetry-instrumentation-sqlalchemy>=0.49b0",
     "prometheus-client>=0.21",
+    "pyyaml>=6.0",
+    "packaging>=24.0",
 ]
 
 [project.optional-dependencies]
@@ -56,6 +58,7 @@ dev = [
     "mypy>=1.13",
     "pre-commit>=4.0",
     "types-redis",
+    "types-PyYAML",
 ]
 
 [project.urls]

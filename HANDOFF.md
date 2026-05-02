@@ -75,7 +75,7 @@ Update this list as work-streams move through their states.
 | 4.3 | RBAC + auth-object engine | BLOCKED-ON-4.2 | Needs identity tables first. |
 | 4.4 | Master Data core | BLOCKED-ON-4.2 | Needs `tenant_id` and RLS in place first. |
 | 4.5 | Event bus + embedding pipeline | SKELETON DONE | Event envelope + EventBus protocol + InMemoryEventBus + glob pattern matcher (`*`/`**`); per-tenant Qdrant collection naming convention (`openspine__<tenant>`); embedding worker entrypoint subscribed to `master_data.**`. Real Redis/Qdrant clients deferred until integration tests can run. 41 tests pass. |
-| 4.6 | Plugin host | UNBLOCKED | Hook-naming convention resolved by ADR 0008 (entity.action; journal_entry replaces fi_document). Ready to land alongside the example plugin. |
+| 4.6 | Plugin host | SKELETON DONE | core/plugins.py: discovery via Python entry points (group `openspine.plugins`), pydantic-validated PluginManifest (strict, extra=forbid), PEP 440 compatibility check (mandatory range), three-state lifecycle (`loaded` / `skipped_incompatible` / `failed`), per-plugin record with reason. Loaded on app startup. `/system/plugins` exposes the registry to operators and agents. examples/openspine-plugin-example/ ships a reference plugin demonstrating all four extension mechanisms. Custom-field column generation, route mounting, and auth-object registration are accepted in the manifest but defer to §4.4/§4.3 for activation. 59 tests pass. |
 | 4.7 | Agent surface | BLOCKED-ON-4.2/4.4/4.5 | |
 | 4.8 | Observability | DONE | OTel tracing scaffolded with FastAPI auto-instrumentation; Prometheus `/metrics` endpoint; `MetricsMiddleware` records request count + latency by (method, route, status); domain-shaped counters/histograms (events, embedding lag, auth decisions, hook dispatch) registered. 18 tests pass. |
 
@@ -123,6 +123,9 @@ Commits on `claude/review-codebase-8XRRf`, oldest first:
 - Resolve hook-naming convention (ADR 0008)
 - Lock tenant isolation to logical only (ADR 0005)
 - Resolve audit topology + FX rate reference + clean up NEEDS-INPUT
+- Fix CI failures: ruff lint + format + mypy
+- Update HANDOFF verification cheat-sheet to match CI
+- Plugin host skeleton + reference example (v0.1 §4.6)
 - (further commits land below this line)
 
 ## Open questions queued

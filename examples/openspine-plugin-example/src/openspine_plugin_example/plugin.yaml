@@ -1,0 +1,45 @@
+# OpenSpine plugin manifest — reference example.
+#
+# Every section here exists to demonstrate one extension mechanism. Real
+# plugins typically declare a small subset.
+
+name: example
+version: 0.1.0
+openspine_compatible: ">=0.1.0.dev0,<2.0"
+description: "Reference plugin demonstrating the OpenSpine extension surface."
+author: "OpenSpine community"
+
+# Subscribe to hooks. Names follow the canonical entity.{pre,post}_{verb}
+# convention (ADR 0008). The handler is a dotted import path.
+hooks:
+  - name: business_partner.pre_save
+    handler: openspine_plugin_example.hooks.validate_business_partner
+  - name: material.post_save
+    handler: openspine_plugin_example.hooks.audit_material_save
+
+# Add columns to standard entities. The plugin host accepts the
+# declaration in v0.1; column generation lands with §4.4 (MD core).
+custom_fields:
+  - entity: md.business_partner
+    field: example_marker
+    type: string
+    nullable: true
+    indexed: false
+    visible_in:
+      - api
+      - semantic_index
+
+# Mount custom REST routes under /example/. Authorisation framework is the
+# same as core; routes go through the auth-object engine when §4.3 lands.
+routes:
+  - prefix: /example
+    module: openspine_plugin_example.endpoints
+
+# Register additional authorisation objects. Plugins cannot override core
+# objects; they can only add new ones, namespaced by plugin id.
+authorisation_objects:
+  - domain: example.greeting
+    actions:
+      - read
+      - write
+    qualifiers: []
