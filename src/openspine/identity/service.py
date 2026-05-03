@@ -637,6 +637,34 @@ async def bootstrap_tenant_and_admin(
         target_id=admin.id,
         created_by=admin.id,
     )
+
+    # Seed the system catalogue (auth objects, roles, SoD baseline) and
+    # grant the SYSTEM_TENANT_ADMIN composite role to the admin so they
+    # can actually do things on day one.
+    from sqlalchemy import select
+
+    from openspine.identity.rbac_models import IdPrincipalRole, IdRoleComposite
+    from openspine.identity.seed import seed_system_catalogue
+
+    await seed_system_catalogue(session, tenant_id=tenant.id, actor_principal_id=admin.id)
+    admin_composite = (
+        await session.execute(
+            select(IdRoleComposite).where(
+                IdRoleComposite.tenant_id == tenant.id,
+                IdRoleComposite.system_key == "SYSTEM_TENANT_ADMIN",
+            )
+        )
+    ).scalar_one()
+    session.add(
+        IdPrincipalRole(
+            tenant_id=tenant.id,
+            principal_id=admin.id,
+            role_composite_id=admin_composite.id,
+            created_by=admin.id,
+            updated_by=admin.id,
+        )
+    )
+    await session.flush()
     return tenant, admin
 
 

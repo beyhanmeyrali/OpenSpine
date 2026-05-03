@@ -66,3 +66,17 @@ def test_unknown_subcommand_errors() -> None:
     parser = _build_parser()
     with pytest.raises(SystemExit):
         parser.parse_args(["frobnicate"])
+
+
+def test_seed_system_catalogue_requires_tenant_slug() -> None:
+    parser = _build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["seed-system-catalogue"])
+
+
+def test_seed_system_catalogue_accepts_minimal_args() -> None:
+    parser = _build_parser()
+    args = parser.parse_args(["seed-system-catalogue", "--tenant-slug", "acme"])
+    assert args.command == "seed-system-catalogue"
+    assert args.tenant_slug == "acme"
+    assert args.actor_principal_id is None

@@ -25,6 +25,8 @@ Subcommands:
         --admin-display-name "Admin" \\
         --admin-email admin@acme.example
 
+    openspine seed-system-catalogue --tenant-slug acme
+
 The password is read from the `OPENSPINE_BOOTSTRAP_ADMIN_PASSWORD`
 environment variable (so it doesn't show up in `ps`). If unset, the
 CLI generates one and prints it once.
@@ -37,9 +39,14 @@ import asyncio
 import os
 import secrets
 import sys
+import uuid
 
 from openspine.db import SessionFactory
-from openspine.identity.service import bootstrap_tenant_and_admin
+from openspine.identity.seed import seed_system_catalogue
+from openspine.identity.service import (
+    bootstrap_tenant_and_admin,
+    get_tenant_by_slug_or_none,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -70,6 +77,24 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Admin's display name.",
     )
     create.add_argument("--admin-email", required=True, help="Admin's email.")
+
+    seed = sub.add_parser(
+        "seed-system-catalogue",
+        help=(
+            "Idempotently re-apply the system catalogue (auth objects, "
+            "single + composite roles, SoD rules) to an existing tenant. "
+            "Useful after a system pack update."
+        ),
+    )
+    seed.add_argument("--tenant-slug", required=True)
+    seed.add_argument(
+        "--actor-principal-id",
+        help=(
+            "UUID of the principal recorded as the catalogue updater on "
+            "audit columns. Defaults to the tenant's first admin if a "
+            "principal with username 'admin' exists."
+        ),
+    )
     return parser
 
 
@@ -103,6 +128,49 @@ async def _run_create_tenant(args: argparse.Namespace) -> int:
     return 0
 
 
+async def _run_seed_system_catalogue(args: argparse.Namespace) -> int:
+    from sqlalchemy import select, text
+
+    from openspine.identity.models import IdPrincipal
+
+    async with SessionFactory() as db:
+        tenant = await get_tenant_by_slug_or_none(db, args.tenant_slug)
+        if tenant is None:
+            print(f"error: no tenant with slug {args.tenant_slug!r}", file=sys.stderr)
+            return 1
+
+        # Resolve the actor principal.
+        if args.actor_principal_id:
+            actor_id = uuid.UUID(args.actor_principal_id)
+        else:
+            await db.execute(
+                text("SELECT set_config('openspine.tenant_id', :t, true)").bindparams(
+                    t=str(tenant.id)
+                )
+            )
+            stmt = select(IdPrincipal).where(
+                IdPrincipal.tenant_id == tenant.id,
+                IdPrincipal.username == "admin",
+            )
+            admin = (await db.execute(stmt)).scalar_one_or_none()
+            if admin is None:
+                print(
+                    "error: no principal with username 'admin'; pass "
+                    "--actor-principal-id explicitly",
+                    file=sys.stderr,
+                )
+                return 1
+            actor_id = admin.id
+
+        counts = await seed_system_catalogue(db, tenant_id=tenant.id, actor_principal_id=actor_id)
+        await db.commit()
+
+    print(f"seeded into tenant {tenant.slug!r}:")
+    for k, v in counts.items():
+        print(f"    {k:20s} +{v} new (existing rows untouched)")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Entry point. Returns a process exit code.
 
@@ -112,6 +180,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "create-tenant":
         return asyncio.run(_run_create_tenant(args))
+    if args.command == "seed-system-catalogue":
+        return asyncio.run(_run_seed_system_catalogue(args))
     parser.error(f"unknown command {args.command!r}")
     return 2
 

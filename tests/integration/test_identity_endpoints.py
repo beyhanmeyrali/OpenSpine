@@ -86,7 +86,22 @@ async def bootstrapped_tenant() -> AsyncIterator[dict[str, str]]:
         )
         # Explicit ::uuid casts because asyncpg sends bound strings as
         # VARCHAR; Postgres won't implicitly compare uuid = varchar.
+        # Order matters: leaf tables first, then anything FK-referenced
+        # by them. The RBAC catalogue is seeded by bootstrap_tenant_and_admin,
+        # so it has to be torn down here too.
         for table in (
+            "id_auth_decision_log",
+            "id_sod_override",
+            "id_sod_rule_clause",
+            "id_sod_rule",
+            "id_principal_role",
+            "id_role_composite_member",
+            "id_role_composite",
+            "id_permission",
+            "id_role_single",
+            "id_auth_object_qualifier",
+            "id_auth_object_action",
+            "id_auth_object",
             "id_audit_event",
             "id_token",
             "id_session",
