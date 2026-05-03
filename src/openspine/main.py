@@ -47,11 +47,19 @@ logger = structlog.get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> Any:
+    from openspine.workers.indexer import register_indexer
+
     settings = get_settings()
     configure_logging(settings.log_level)
     configure_tracing(settings)
     instrument_app(app)
     plugins = load_plugins(app=app)
+    # Register the in-process embedding indexer against the bus. With
+    # the InMemoryEventBus this means MD service publishes are
+    # delivered synchronously into the indexer; with a future Redis
+    # bus the worker would run as a separate process and consume the
+    # same stream pattern.
+    await register_indexer()
     logger.info(
         "openspine.startup",
         version=__version__,
@@ -196,6 +204,39 @@ async def list_plugins() -> list[dict[str, Any]]:
             }
         )
     return out
+
+
+@app.post("/system/reconcile-embeddings", tags=["system"])
+async def reconcile_embeddings(request: Request) -> Response:
+    """Re-index every MD entity in the caller's tenant into Qdrant.
+
+    The v0.1 §3 #4 acceptance criterion: "Killing Qdrant and running
+    reconciliation rebuilds the index without manual intervention."
+    Authority gate: `system.tenant:configure` (the same gate that
+    protects other tenant-wide admin operations).
+    """
+    import uuid as _uuid
+
+    from openspine.core.errors import AuthenticationError
+    from openspine.identity.authz import enforce
+    from openspine.identity.context import PrincipalContext
+    from openspine.identity.middleware import get_request_session
+    from openspine.workers.indexer import reconcile_tenant
+
+    ctx: PrincipalContext = getattr(request.state, "principal_context", None) or (
+        PrincipalContext.anonymous(trace_id=_uuid.uuid4())
+    )
+    if ctx.is_anonymous or ctx.tenant_id is None:
+        raise AuthenticationError(
+            "authentication required",
+            domain="auth",
+            action="access",
+            reason="not_authenticated",
+        )
+    session = get_request_session()
+    await enforce(session, ctx=ctx, domain="system.tenant", action="configure")
+    counts = await reconcile_tenant(tenant_id=str(ctx.tenant_id), session=session)
+    return JSONResponse(content={"status": "ok", "indexed": counts})
 
 
 @app.get("/metrics", tags=["system"], include_in_schema=False)

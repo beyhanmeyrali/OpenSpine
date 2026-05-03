@@ -51,7 +51,10 @@ services:
 
   ollama:
     # Local embeddings runtime. Pull the embedding model after the container
-    # is up: `docker exec openspine-ollama ollama pull qwen2.5:1.5b`.
+    # is up: `docker exec openspine-ollama ollama pull qwen3-embedding:0.6b`.
+    # Qwen3-Embedding-0.6B: 1024-d, ~640 MB, MTEB-multilingual 64.33.
+    # Alternative: any OpenAI-compatible /v1/embeddings server (e.g.
+    # `llama-server -m Qwen3-Embedding-0.6B-Q8_0.gguf --embedding`).
     image: ollama/ollama:latest
     container_name: openspine-ollama
     ports:

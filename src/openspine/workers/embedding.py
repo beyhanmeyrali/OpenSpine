@@ -3,8 +3,10 @@
 Run with `python -m openspine.workers.embedding` (or `make worker`).
 
 Subscribes to every `master_data.*.created|updated` stream, generates a vector
-embedding via Ollama (`OPENSPINE_EMBEDDING_MODEL`, default `qwen2.5:1.5b`),
-and upserts into the per-tenant Qdrant collection.
+embedding via the OpenAI-compatible `/v1/embeddings` endpoint
+(default model `qwen3-embedding:0.6b` — pull with
+`ollama pull qwen3-embedding:0.6b`), and upserts into the per-tenant
+Qdrant collection.
 
 The worker is intentionally simple in v0.1 — no batching, no retries beyond
 the bus's at-least-once delivery, no smart back-off. Reconciliation handles

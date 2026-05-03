@@ -15,10 +15,27 @@ logic lands milestone by milestone per `docs/roadmap/v0.1-foundation.md`.
 make dev          # creates .venv, installs runtime + dev deps, installs pre-commit
 cp .env.example .env
 make up           # starts Postgres, Redis, Qdrant, Ollama
-docker exec openspine-ollama ollama pull qwen2.5:1.5b   # pull the embedding model
-make migrate      # runs Alembic to head (currently a no-op base revision)
+docker exec openspine-ollama ollama pull qwen3-embedding:0.6b   # pull the embedding model
+make migrate      # runs Alembic to head
 make run          # starts the FastAPI app on :8000 with auto-reload
 ```
+
+The default embedding model is **Qwen3-Embedding-0.6B** (1024-d,
+~640 MB on disk, MTEB-multilingual 64.33). The indexer talks to the
+**OpenAI-compatible `/v1/embeddings` endpoint**, so any of these
+servers work without code changes:
+
+- **Ollama** (default; `OPENSPINE_OLLAMA_URL=http://localhost:11434`,
+  pull with `ollama pull qwen3-embedding:0.6b`).
+- **llama.cpp** (`llama-server -m Qwen3-Embedding-0.6B-Q8_0.gguf
+  --embedding`); point `OPENSPINE_OLLAMA_URL` at `http://localhost:8080`.
+- Any other server that speaks the OpenAI embeddings shape.
+
+When the embedding service is unreachable, the indexer falls back
+to a deterministic SHA-512 pseudo-embedding so CI and the test
+suite can exercise the full pipeline without the model. The
+fallback is exact-text-equality only (no semantic similarity); it
+exists for development affordance, not production.
 
 Visit:
 

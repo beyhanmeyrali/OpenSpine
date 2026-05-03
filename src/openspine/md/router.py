@@ -683,17 +683,23 @@ async def hybrid_search(
 ) -> SearchResponse:
     """Hybrid search per ARCHITECTURE.md §7.
 
-    Semantic candidates from Qdrant (when available) → structured
-    verification against Postgres → return both rankings + the
-    verifying rows.
+    Order:
+    1. Embed the query, query Qdrant for top-K candidate vectors in
+       the tenant's collection (filtered by entity).
+    2. For each Qdrant hit, verify the row in Postgres (RLS already
+       gates by tenant). Drop hits whose row is gone.
+    3. If Qdrant returns nothing — first run, indexer paused, Qdrant
+       down — fall back to Postgres ILIKE so the endpoint always
+       returns something relevant. `_meta.source` distinguishes
+       'semantic' from 'structured'.
 
-    v0.1 simplification: Qdrant has no vectors yet (the embedding
-    worker writes them when entities change post-§4.5; v0.2 work
-    expands this). Until vectors exist, the endpoint falls back to
-    Postgres ILIKE — same response shape, `source='structured'`,
-    `score=None`. The contract is what matters; agents see one shape
-    and don't have to special-case the empty-index startup state.
+    Per ARCHITECTURE.md §10 #3, Postgres is the source of truth.
+    Qdrant is just a candidate ranker — verification is what makes
+    this "semantic-then-structured" rather than "trust the vector
+    index".
     """
+    from openspine.workers.indexer import search as indexer_search
+
     ctx = _ctx(request)
     if entity not in _SEARCHABLE_ENTITIES:
         raise NotFoundError(
@@ -707,10 +713,71 @@ async def hybrid_search(
     # Authority gate: display permission on the entity.
     await enforce(session, ctx=ctx, domain=f"md.{entity}", action="display")
 
-    # In v0.1, the structured fallback is the only path that returns
-    # rows (Qdrant has nothing to index yet). When the embedding
-    # worker starts populating vectors, the Qdrant lookup goes here
-    # and the fallback runs only on miss.
+    # ---- Path 1: semantic candidates from Qdrant ----
+    assert ctx.tenant_id is not None
+    semantic_hits = await indexer_search(
+        tenant_id=str(ctx.tenant_id), entity=entity, query=q, limit=limit
+    )
+    if semantic_hits:
+        ids = [uuid.UUID(h["entity_id"]) for h in semantic_hits if h.get("entity_id")]
+        if entity == "business_partner":
+            verified_bp = (
+                (
+                    await session.execute(
+                        select(MdBusinessPartner).where(MdBusinessPartner.id.in_(ids))
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            row_by_id = {r.id: r for r in verified_bp}
+            sem_hits: list[SearchHit] = []
+            for h in semantic_hits:
+                row_bp = row_by_id.get(uuid.UUID(h["entity_id"]))
+                if row_bp is None:
+                    continue
+                sem_hits.append(
+                    SearchHit(
+                        id=row_bp.id,
+                        entity="business_partner",
+                        number=row_bp.number,
+                        name=row_bp.name,
+                        score=h.get("score"),
+                        source="semantic",
+                    )
+                )
+        else:  # material
+            verified_mat = (
+                (await session.execute(select(MdMaterial).where(MdMaterial.id.in_(ids))))
+                .scalars()
+                .all()
+            )
+            row_by_id_m = {r.id: r for r in verified_mat}
+            sem_hits = []
+            for h in semantic_hits:
+                row_m = row_by_id_m.get(uuid.UUID(h["entity_id"]))
+                if row_m is None:
+                    continue
+                sem_hits.append(
+                    SearchHit(
+                        id=row_m.id,
+                        entity="material",
+                        number=row_m.number,
+                        name=row_m.description,
+                        description=row_m.description,
+                        score=h.get("score"),
+                        source="semantic",
+                    )
+                )
+        if sem_hits:
+            return SearchResponse(
+                hits=sem_hits,
+                _meta=meta_for_search_result(
+                    query=q, entity=entity, source="semantic", total=len(sem_hits)
+                ),
+            )
+
+    # ---- Path 2: structured fallback (Postgres ILIKE) ----
     pattern = f"%{q}%"
     if entity == "business_partner":
         rows_bp = (

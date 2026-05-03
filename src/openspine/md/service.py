@@ -31,6 +31,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from openspine.core.errors import ConflictError, NotFoundError, ValidationError
+from openspine.core.events import Event, get_event_bus
 from openspine.md.models import (
     MdAccountGroup,
     MdBpAddress,
@@ -51,6 +52,22 @@ from openspine.md.models import (
     MdPostingPeriod,
     MdUom,
 )
+
+# ---------------------------------------------------------------------------
+# Event publication helper — fires master_data.* events on commit-side
+# operations so the embedding indexer can react.
+#
+# The InMemoryEventBus delivers synchronously, so the indexer handler
+# runs inline on the request transaction. That keeps v0.1 single-process
+# while preserving the contract (publish-after-commit is what the worker
+# pattern looks like with Redis Streams in v0.2).
+# ---------------------------------------------------------------------------
+
+
+async def _publish_md_event(*, stream: str, tenant_id: uuid.UUID, payload: dict[str, Any]) -> None:
+    bus = get_event_bus()
+    await bus.publish(Event(stream=stream, tenant_id=str(tenant_id), payload=payload))
+
 
 # ---------------------------------------------------------------------------
 # Lookup helpers (all assume the tenant GUC is set by middleware)
@@ -561,6 +578,20 @@ async def create_business_partner(
         )
 
     await session.flush()
+    from openspine.workers.indexer import bp_indexable_text
+
+    await _publish_md_event(
+        stream="master_data.business_partner.created",
+        tenant_id=tenant_id,
+        payload={
+            "id": str(bp.id),
+            "number": bp.number,
+            "kind": bp.kind,
+            "name": bp.name,
+            "country_code": bp.country_code,
+            "indexable_text": bp_indexable_text(bp.name, bp.number, bp.country_code),
+        },
+    )
     return bp
 
 
@@ -592,6 +623,19 @@ async def create_material(
     )
     session.add(row)
     await session.flush()
+    from openspine.workers.indexer import material_indexable_text
+
+    await _publish_md_event(
+        stream="master_data.material.created",
+        tenant_id=tenant_id,
+        payload={
+            "id": str(row.id),
+            "number": row.number,
+            "description": row.description,
+            "material_type": row.material_type,
+            "indexable_text": material_indexable_text(row.description, row.number),
+        },
+    )
     return row
 
 

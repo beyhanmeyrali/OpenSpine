@@ -36,9 +36,20 @@ class Settings(BaseSettings):
     # Qdrant (semantic index)
     qdrant_url: str = "http://localhost:6333"
 
-    # Ollama (embeddings)
+    # Embeddings.
+    #
+    # The indexer talks to any service exposing the OpenAI-compatible
+    # `/v1/embeddings` endpoint. Ollama (default port 11434) and
+    # llama.cpp's `llama-server --embedding` (default port 8080) both
+    # qualify. The base URL is the host root; the indexer appends
+    # `/v1/embeddings`.
+    #
+    # Default model is `qwen3-embedding:0.6b` — 1024-d, 639 MB, MTEB-
+    # multilingual 64.33 (June 2025 release from the Qwen team). True
+    # embedding model, not a chat model.
     ollama_url: str = "http://localhost:11434"
-    embedding_model: str = "qwen2.5:1.5b"
+    embedding_model: str = "qwen3-embedding:0.6b"
+    embedding_dim: int = 1024
 
     # OpenTelemetry
     otel_exporter_otlp_endpoint: str = "http://localhost:4317"

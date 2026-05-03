@@ -49,7 +49,7 @@ up:
 	docker compose up -d
 	@echo "Waiting for Postgres…"
 	@until docker exec openspine-postgres pg_isready -U openspine >/dev/null 2>&1; do sleep 1; done
-	@echo "Stack is up. Pull the embedding model with: docker exec openspine-ollama ollama pull qwen2.5:1.5b"
+	@echo "Stack is up. Pull the embedding model with: docker exec openspine-ollama ollama pull qwen3-embedding:0.6b"
 
 down:
 	docker compose down
