@@ -89,6 +89,13 @@ class _AuditColumnsMixin:
     `created_by` and `updated_by` reference `id_principal(id)` via string
     FK; SQLAlchemy resolves the reference at metadata-load time, so we
     don't need to import the principal table here.
+
+    The FK is `DEFERRABLE INITIALLY DEFERRED`. The bootstrap path inserts
+    the first tenant + first principal in one transaction, where each row
+    references the other before either is committed. Postgres only checks
+    deferred constraints at COMMIT, breaking the chicken-and-egg cycle.
+    No production code path relies on this; it is a one-time bootstrap
+    affordance.
     """
 
     created_at: Mapped[datetime] = mapped_column(
@@ -98,7 +105,7 @@ class _AuditColumnsMixin:
     )
     created_by: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("id_principal.id"),
+        ForeignKey("id_principal.id", deferrable=True, initially="DEFERRED"),
         nullable=False,
     )
     updated_at: Mapped[datetime] = mapped_column(
@@ -108,7 +115,7 @@ class _AuditColumnsMixin:
     )
     updated_by: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("id_principal.id"),
+        ForeignKey("id_principal.id", deferrable=True, initially="DEFERRED"),
         nullable=False,
     )
     version: Mapped[int] = mapped_column(
@@ -124,11 +131,15 @@ class _TenantColumnMixin:
     Every business table (excepting documented globals like `md_uom`,
     `md_currency`, `md_uom_conversion`) carries `tenant_id`. RLS policies
     reference this column.
+
+    Like the audit-column FKs above, the FK to `id_tenant(id)` is
+    `DEFERRABLE INITIALLY DEFERRED` so the bootstrap transaction can
+    insert the first tenant and the first principal atomically.
     """
 
     tenant_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("id_tenant.id"),
+        ForeignKey("id_tenant.id", deferrable=True, initially="DEFERRED"),
         nullable=False,
         index=True,
     )
