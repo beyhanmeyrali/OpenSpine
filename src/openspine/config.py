@@ -64,10 +64,12 @@ class Settings(BaseSettings):
 
     @property
     def sync_database_url(self) -> str:
-        # Alembic uses the synchronous driver.
+        # Alembic uses the synchronous driver. We standardise on psycopg3
+        # (`psycopg`, installed via the `psycopg[binary]` extra) — newer
+        # protocol support, simpler maintenance story than psycopg2.
         return str(
             PostgresDsn.build(
-                scheme="postgresql",
+                scheme="postgresql+psycopg",
                 username=self.db_user,
                 password=self.db_password,
                 host=self.db_host,

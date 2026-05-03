@@ -2,16 +2,19 @@
 
 Tables prefixed `id_*`. See `docs/identity/` for the specification.
 
-The §4.2 cut lands here: tenant + principal (human/agent/technical) +
+The §4.2 cut covers tenant + principal (human/agent/technical) +
 credential + session + token + federated-identity stub + audit-event.
-RBAC and the auth-object engine land in §4.3 (`docs/identity/permissions.md`).
+The §4.3 cut adds the auth-object catalogue, two-tier role model,
+permissions, principal-role assignments, SoD rules + overrides, and
+the append-only auth decision log.
 
-Importing this package registers the identity ORM models on the shared
+Importing this package registers all identity ORM models on the shared
 `openspine.core.database.metadata`, which is what Alembic and the
 schema-invariants test introspect.
 """
 
 from openspine.identity import models as models
+from openspine.identity import rbac_models as rbac_models
 from openspine.identity.models import (
     IdAgentProfile,
     IdAuditEvent,
@@ -24,15 +27,41 @@ from openspine.identity.models import (
     IdTenantSetting,
     IdToken,
 )
+from openspine.identity.rbac_models import (
+    IdAuthDecisionLog,
+    IdAuthObject,
+    IdAuthObjectAction,
+    IdAuthObjectQualifier,
+    IdPermission,
+    IdPrincipalRole,
+    IdRoleComposite,
+    IdRoleCompositeMember,
+    IdRoleSingle,
+    IdSodOverride,
+    IdSodRule,
+    IdSodRuleClause,
+)
 
 __all__ = [
     "IdAgentProfile",
     "IdAuditEvent",
+    "IdAuthDecisionLog",
+    "IdAuthObject",
+    "IdAuthObjectAction",
+    "IdAuthObjectQualifier",
     "IdCredential",
     "IdFederatedIdentity",
     "IdHumanProfile",
+    "IdPermission",
     "IdPrincipal",
+    "IdPrincipalRole",
+    "IdRoleComposite",
+    "IdRoleCompositeMember",
+    "IdRoleSingle",
     "IdSession",
+    "IdSodOverride",
+    "IdSodRule",
+    "IdSodRuleClause",
     "IdTenant",
     "IdTenantSetting",
     "IdToken",

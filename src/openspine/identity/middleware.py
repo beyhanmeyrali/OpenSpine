@@ -230,26 +230,27 @@ async def _load_active_session(
 async def _touch_credential_last_seen(session: AsyncSession, ctx: PrincipalContext) -> None:
     """Update last_used_at / last_seen_at on the credential the request used.
 
-    Best-effort: failures here must not fail the request. We swallow
-    errors at this point because the request itself has already
-    succeeded.
+    Best-effort: a touch failure must not fail the request, AND must not
+    abort the surrounding transaction (which would roll back the route
+    handler's writes). Wrapping in a savepoint isolates a failure.
     """
     if ctx.is_anonymous:
         return
     now = datetime.now(UTC)
     try:
-        if ctx.auth_method == "token":
-            await session.execute(
-                _UPDATE_TOKEN_LAST_USED.bindparams(
-                    last_used=now, principal_id=str(ctx.principal_id)
+        async with session.begin_nested():
+            if ctx.auth_method == "token":
+                await session.execute(
+                    _UPDATE_TOKEN_LAST_USED.bindparams(
+                        last_used=now, principal_id=str(ctx.principal_id)
+                    )
                 )
-            )
-        elif ctx.auth_method == "session":
-            await session.execute(
-                _UPDATE_SESSION_LAST_SEEN.bindparams(
-                    last_seen=now, principal_id=str(ctx.principal_id)
+            elif ctx.auth_method == "session":
+                await session.execute(
+                    _UPDATE_SESSION_LAST_SEEN.bindparams(
+                        last_seen=now, principal_id=str(ctx.principal_id)
+                    )
                 )
-            )
     except Exception:  # pragma: no cover  (defensive — never observed)
         logger.warning("audit.credential_touch_failed", principal_id=str(ctx.principal_id))
 
@@ -260,18 +261,26 @@ async def _touch_credential_last_seen(session: AsyncSession, ctx: PrincipalConte
 
 from sqlalchemy import text  # noqa: E402
 
-_SET_TENANT_SQL = text("SET LOCAL openspine.tenant_id = :tenant_id")
+# Use set_config(name, value, is_local) — `SET LOCAL` is a parser-level
+# command and does not accept parameter binding. set_config() is the
+# function form, which does. The `true` third arg makes it transaction-
+# local, matching the original semantics.
+_SET_TENANT_SQL = text("SELECT set_config('openspine.tenant_id', :tenant_id, true)")
 
 # Touch last_used on whichever active token this principal authed with.
 # We don't know which token row the bearer was without re-hashing it
 # here, so we touch all active tokens for the principal — there is
 # typically only one in flight at a time. Simpler than threading the
 # row through.
+# asyncpg sends bound string params as VARCHAR; UUID columns require an
+# explicit CAST so Postgres can compare. Inline ::uuid would confuse the
+# SQLAlchemy bind-param parser (`:p::uuid` looks like a different param);
+# CAST(:p AS uuid) is the unambiguous form.
 _UPDATE_TOKEN_LAST_USED = text(
     """
     UPDATE id_token
        SET last_used_at = :last_used
-     WHERE principal_id = :principal_id
+     WHERE principal_id = CAST(:principal_id AS uuid)
        AND revoked_at IS NULL
        AND (expires_at IS NULL OR expires_at > now())
     """
@@ -281,7 +290,7 @@ _UPDATE_SESSION_LAST_SEEN = text(
     """
     UPDATE id_session
        SET last_seen_at = :last_seen
-     WHERE principal_id = :principal_id
+     WHERE principal_id = CAST(:principal_id AS uuid)
        AND status = 'active'
        AND revoked_at IS NULL
     """

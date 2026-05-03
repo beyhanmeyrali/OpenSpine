@@ -675,8 +675,11 @@ async def _load_credential(
 async def _set_tenant_guc(session: AsyncSession, tenant_id: uuid.UUID) -> None:
     from sqlalchemy import text
 
+    # SET LOCAL doesn't accept bind parameters; use set_config() which does.
     await session.execute(
-        text("SET LOCAL openspine.tenant_id = :tenant_id").bindparams(tenant_id=str(tenant_id))
+        text("SELECT set_config('openspine.tenant_id', :tenant_id, true)").bindparams(
+            tenant_id=str(tenant_id)
+        )
     )
 
 

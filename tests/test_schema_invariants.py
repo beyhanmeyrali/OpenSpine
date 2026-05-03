@@ -24,6 +24,16 @@ from __future__ import annotations
 import openspine.identity  # noqa: F401  (registers identity tables on metadata)
 from openspine.core.database import metadata
 from openspine.identity.models import TABLES_WITH_RLS, TABLES_WITH_UPDATE_TRIGGER
+from openspine.identity.rbac_models import (
+    RBAC_TABLES_WITH_RLS,
+    RBAC_TABLES_WITH_UPDATE_TRIGGER,
+)
+
+_ALL_TABLES_WITH_UPDATE_TRIGGER = (
+    *TABLES_WITH_UPDATE_TRIGGER,
+    *RBAC_TABLES_WITH_UPDATE_TRIGGER,
+)
+_ALL_TABLES_WITH_RLS = (*TABLES_WITH_RLS, *RBAC_TABLES_WITH_RLS)
 
 # Tables that legitimately do not carry `tenant_id` (and therefore have
 # no tenant-isolation RLS policy). Listed by table name.
@@ -39,8 +49,20 @@ _GLOBAL_CATALOGUES: frozenset[str] = frozenset(
 _APPEND_ONLY: frozenset[str] = frozenset(
     {
         "id_audit_event",
+        # id_auth_decision_log uses `evaluated_at` instead of `created_at`
+        # (the decision time, which can predate the row insert when the
+        # writer batches). It carries `principal_id` (the actor) but no
+        # `created_by` — the row isn't a principal-driven create, it's
+        # a system audit. The tests below add it to _NO_AUDIT_COLUMNS as
+        # the explicit exemption.
+        "id_auth_decision_log",
     }
 )
+
+# Append-only tables where even the standard `created_at` / `created_by`
+# columns aren't carried, because the table substitutes its own
+# domain-specific columns (e.g., `evaluated_at` on the decision log).
+_NO_AUDIT_COLUMNS: frozenset[str] = frozenset({"id_auth_decision_log"})
 
 # Allowed table prefixes per data-model.md. `alembic_version` is the
 # Alembic bookkeeping table, exempted.
@@ -83,7 +105,8 @@ def test_every_business_table_has_audit_columns() -> None:
     update_cols = {"updated_at", "updated_by", "version"}
     for name in _all_business_tables():
         cols = {c.name for c in metadata.tables[name].columns}
-        assert required <= cols, f"{name!r} missing insert-audit columns: {required - cols}"
+        if name not in _NO_AUDIT_COLUMNS:
+            assert required <= cols, f"{name!r} missing insert-audit columns: {required - cols}"
         if name in _APPEND_ONLY:
             assert not (update_cols & cols), (
                 f"{name!r} is declared append-only but carries update columns: {update_cols & cols}"
@@ -189,10 +212,10 @@ def test_trigger_table_list_matches_update_audit_tables() -> None:
         cols = {c.name for c in metadata.tables[name].columns}
         if {"updated_at", "version"} <= cols:
             expected.add(name)
-    assert set(TABLES_WITH_UPDATE_TRIGGER) == expected, (
-        "TABLES_WITH_UPDATE_TRIGGER drift: "
-        f"missing={expected - set(TABLES_WITH_UPDATE_TRIGGER)}, "
-        f"extra={set(TABLES_WITH_UPDATE_TRIGGER) - expected}"
+    assert set(_ALL_TABLES_WITH_UPDATE_TRIGGER) == expected, (
+        "Update-trigger registry drift: "
+        f"missing={expected - set(_ALL_TABLES_WITH_UPDATE_TRIGGER)}, "
+        f"extra={set(_ALL_TABLES_WITH_UPDATE_TRIGGER) - expected}"
     )
 
 
@@ -207,8 +230,8 @@ def test_rls_table_list_includes_all_tenant_scoped_id_tables() -> None:
         if name in _GLOBAL_CATALOGUES:
             continue
         expected.add(name)
-    assert set(TABLES_WITH_RLS) == expected, (
-        "TABLES_WITH_RLS drift: "
-        f"missing={expected - set(TABLES_WITH_RLS)}, "
-        f"extra={set(TABLES_WITH_RLS) - expected}"
+    assert set(_ALL_TABLES_WITH_RLS) == expected, (
+        "RLS registry drift: "
+        f"missing={expected - set(_ALL_TABLES_WITH_RLS)}, "
+        f"extra={set(_ALL_TABLES_WITH_RLS) - expected}"
     )

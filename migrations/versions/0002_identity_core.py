@@ -61,46 +61,70 @@ _RLS_TABLES: tuple[str, ...] = (
 )
 
 
-def _audit_columns_no_pk() -> list[sa.Column[object]]:
+def _audit_columns_no_pk(
+    *, with_principal_fk: bool = True
+) -> list[sa.Column[object]]:
     """The five audit columns shared by every BusinessTableMixin/AuditMixin
-    table. Returned as Column objects for use in `op.create_table`.
+    table.
 
-    `created_by` and `updated_by` reference `id_principal.id` with
-    DEFERRABLE INITIALLY DEFERRED so the bootstrap path can insert tenant
-    + principal atomically.
+    `with_principal_fk=False` produces the columns WITHOUT the FK to
+    `id_principal.id`. We use that for the two bootstrap tables
+    (`id_tenant`, `id_principal`) where the FK target doesn't exist
+    at create-table time. The FK is added back via ALTER TABLE after
+    both tables exist (DEFERRABLE INITIALLY DEFERRED handles the
+    runtime insert cycle separately).
     """
-    return [
+    cols: list[sa.Column[object]] = [
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
             nullable=False,
             server_default=sa.text("now()"),
         ),
-        sa.Column(
-            "created_by",
-            pg.UUID(as_uuid=True),
-            sa.ForeignKey("id_principal.id", deferrable=True, initially="DEFERRED"),
-            nullable=False,
-        ),
+    ]
+    if with_principal_fk:
+        cols.append(
+            sa.Column(
+                "created_by",
+                pg.UUID(as_uuid=True),
+                sa.ForeignKey(
+                    "id_principal.id", deferrable=True, initially="DEFERRED"
+                ),
+                nullable=False,
+            )
+        )
+    else:
+        cols.append(sa.Column("created_by", pg.UUID(as_uuid=True), nullable=False))
+    cols.append(
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
             nullable=False,
             server_default=sa.text("now()"),
-        ),
-        sa.Column(
-            "updated_by",
-            pg.UUID(as_uuid=True),
-            sa.ForeignKey("id_principal.id", deferrable=True, initially="DEFERRED"),
-            nullable=False,
-        ),
+        )
+    )
+    if with_principal_fk:
+        cols.append(
+            sa.Column(
+                "updated_by",
+                pg.UUID(as_uuid=True),
+                sa.ForeignKey(
+                    "id_principal.id", deferrable=True, initially="DEFERRED"
+                ),
+                nullable=False,
+            )
+        )
+    else:
+        cols.append(sa.Column("updated_by", pg.UUID(as_uuid=True), nullable=False))
+    cols.append(
         sa.Column(
             "version",
             sa.Integer(),
             nullable=False,
             server_default=sa.text("1"),
-        ),
-    ]
+        )
+    )
+    return cols
 
 
 def _id_pk() -> sa.Column[object]:
@@ -112,11 +136,20 @@ def _id_pk() -> sa.Column[object]:
     )
 
 
-def _tenant_fk() -> sa.Column[object]:
+def _tenant_fk(*, with_fk: bool = True) -> sa.Column[object]:
+    """The standard `tenant_id` column. `with_fk=False` for the
+    bootstrap principal table (FK added separately via ALTER)."""
+    if with_fk:
+        return sa.Column(
+            "tenant_id",
+            pg.UUID(as_uuid=True),
+            sa.ForeignKey("id_tenant.id", deferrable=True, initially="DEFERRED"),
+            nullable=False,
+            index=True,
+        )
     return sa.Column(
         "tenant_id",
         pg.UUID(as_uuid=True),
-        sa.ForeignKey("id_tenant.id", deferrable=True, initially="DEFERRED"),
         nullable=False,
         index=True,
     )
@@ -140,6 +173,9 @@ def upgrade() -> None:
     )
 
     # 2. id_tenant — global registry, no RLS, no tenant_id column.
+    #    Created without the FKs to id_principal because that table
+    #    doesn't exist yet (cyclic dependency). FKs are added by
+    #    ALTER TABLE below once id_principal exists.
     op.create_table(
         "id_tenant",
         _id_pk(),
@@ -152,14 +188,78 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.text("'{}'::jsonb"),
         ),
-        *_audit_columns_no_pk(),
+        *_audit_columns_no_pk(with_principal_fk=False),
         sa.UniqueConstraint("slug", name="uq_id_tenant_slug"),
         sa.CheckConstraint(
             "status IN ('active', 'suspended', 'archived')", name="ck_id_tenant_status"
         ),
     )
 
-    # 3. id_tenant_setting
+    # 3. id_principal — must come before id_tenant_setting (and the
+    #    rest) because every other table's audit FK references
+    #    id_principal. The table is created without the audit-author
+    #    FKs (self-reference would resolve, but we use the same
+    #    "no FK" path for consistency with id_tenant) and the FKs are
+    #    added by ALTER TABLE below.
+    op.create_table(
+        "id_principal",
+        _id_pk(),
+        _tenant_fk(),  # id_tenant exists; tenant_id FK is fine here.
+        sa.Column("kind", sa.Text(), nullable=False),
+        sa.Column("username", sa.Text(), nullable=False),
+        sa.Column("display_name", sa.Text(), nullable=False),
+        sa.Column("status", sa.Text(), nullable=False, server_default=sa.text("'active'")),
+        *_audit_columns_no_pk(with_principal_fk=False),
+        sa.CheckConstraint(
+            "kind IN ('human', 'agent', 'technical')", name="ck_id_principal_kind"
+        ),
+        sa.CheckConstraint(
+            "status IN ('active', 'suspended', 'deleted')", name="ck_id_principal_status"
+        ),
+        sa.UniqueConstraint("tenant_id", "username", name="uq_id_principal_username"),
+    )
+
+    # Now id_principal exists. Attach the audit-author FKs to id_tenant
+    # and id_principal so the bootstrap insert path can rely on them.
+    op.create_foreign_key(
+        "fk_id_tenant_created_by_id_principal",
+        "id_tenant",
+        "id_principal",
+        ["created_by"],
+        ["id"],
+        deferrable=True,
+        initially="DEFERRED",
+    )
+    op.create_foreign_key(
+        "fk_id_tenant_updated_by_id_principal",
+        "id_tenant",
+        "id_principal",
+        ["updated_by"],
+        ["id"],
+        deferrable=True,
+        initially="DEFERRED",
+    )
+    op.create_foreign_key(
+        "fk_id_principal_created_by_id_principal",
+        "id_principal",
+        "id_principal",
+        ["created_by"],
+        ["id"],
+        deferrable=True,
+        initially="DEFERRED",
+    )
+    op.create_foreign_key(
+        "fk_id_principal_updated_by_id_principal",
+        "id_principal",
+        "id_principal",
+        ["updated_by"],
+        ["id"],
+        deferrable=True,
+        initially="DEFERRED",
+    )
+
+    # 4. id_tenant_setting (and onward — both id_tenant and id_principal
+    #    exist now, so audit FKs and tenant FKs work normally).
     op.create_table(
         "id_tenant_setting",
         _id_pk(),
@@ -168,25 +268,6 @@ def upgrade() -> None:
         sa.Column("value", pg.JSONB(), nullable=False),
         *_audit_columns_no_pk(),
         sa.UniqueConstraint("tenant_id", "key", name="uq_id_tenant_setting_key"),
-    )
-
-    # 4. id_principal
-    op.create_table(
-        "id_principal",
-        _id_pk(),
-        _tenant_fk(),
-        sa.Column("kind", sa.Text(), nullable=False),
-        sa.Column("username", sa.Text(), nullable=False),
-        sa.Column("display_name", sa.Text(), nullable=False),
-        sa.Column("status", sa.Text(), nullable=False, server_default=sa.text("'active'")),
-        *_audit_columns_no_pk(),
-        sa.CheckConstraint(
-            "kind IN ('human', 'agent', 'technical')", name="ck_id_principal_kind"
-        ),
-        sa.CheckConstraint(
-            "status IN ('active', 'suspended', 'deleted')", name="ck_id_principal_status"
-        ),
-        sa.UniqueConstraint("tenant_id", "username", name="uq_id_principal_username"),
     )
     op.create_index(
         "ix_id_principal_tenant_kind", "id_principal", ["tenant_id", "kind"]
@@ -505,10 +586,24 @@ def downgrade() -> None:
     op.drop_index("ix_id_human_profile_manager", table_name="id_human_profile")
     op.drop_table("id_human_profile")
 
+    op.drop_table("id_tenant_setting")
+
+    # Break the cyclic FKs before dropping the tables.
+    op.drop_constraint(
+        "fk_id_principal_updated_by_id_principal", "id_principal", type_="foreignkey"
+    )
+    op.drop_constraint(
+        "fk_id_principal_created_by_id_principal", "id_principal", type_="foreignkey"
+    )
+    op.drop_constraint(
+        "fk_id_tenant_updated_by_id_principal", "id_tenant", type_="foreignkey"
+    )
+    op.drop_constraint(
+        "fk_id_tenant_created_by_id_principal", "id_tenant", type_="foreignkey"
+    )
+
     op.drop_index("ix_id_principal_tenant_kind", table_name="id_principal")
     op.drop_table("id_principal")
-
-    op.drop_table("id_tenant_setting")
     op.drop_table("id_tenant")
 
     op.execute("DROP FUNCTION IF EXISTS _id_touch_updated_audit();")

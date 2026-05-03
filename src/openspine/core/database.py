@@ -167,7 +167,10 @@ class BusinessTableMixin(_UUIDPrimaryKeyMixin, _TenantColumnMixin, _AuditColumns
 # ---- RLS helpers -----------------------------------------------------------
 
 
-SET_TENANT_SQL = text("SET LOCAL openspine.tenant_id = :tenant_id")
+# Use set_config(name, value, is_local) — `SET LOCAL` is parser-level
+# and does not accept bind parameters. set_config() is the function form.
+# Third arg `true` makes it transaction-local, matching SET LOCAL semantics.
+SET_TENANT_SQL = text("SELECT set_config('openspine.tenant_id', :tenant_id, true)")
 
 
 def set_session_tenant(session: Any, tenant_id: str | uuid.UUID) -> None:
