@@ -57,9 +57,7 @@ async def seeded_tenant() -> AsyncIterator[dict[str, str]]:
 
     async with SessionFactory() as db:
         await db.execute(
-            text("SELECT set_config('openspine.tenant_id', :t, true)").bindparams(
-                t=str(tenant_id)
-            )
+            text("SELECT set_config('openspine.tenant_id', :t, true)").bindparams(t=str(tenant_id))
         )
         for table in (
             "id_auth_decision_log",
@@ -82,14 +80,12 @@ async def seeded_tenant() -> AsyncIterator[dict[str, str]]:
             "id_principal",
         ):
             await db.execute(
-                text(
-                    f"DELETE FROM {table} WHERE tenant_id = CAST(:t AS uuid)"
-                ).bindparams(t=str(tenant_id))
+                text(f"DELETE FROM {table} WHERE tenant_id = CAST(:t AS uuid)").bindparams(
+                    t=str(tenant_id)
+                )
             )
         await db.execute(
-            text("DELETE FROM id_tenant WHERE id = CAST(:t AS uuid)").bindparams(
-                t=str(tenant_id)
-            )
+            text("DELETE FROM id_tenant WHERE id = CAST(:t AS uuid)").bindparams(t=str(tenant_id))
         )
         await db.commit()
 
@@ -98,29 +94,19 @@ async def test_bootstrap_seeds_full_catalogue(seeded_tenant: dict[str, str]) -> 
     tenant_id = uuid.UUID(seeded_tenant["tenant_id"])
     async with SessionFactory() as db:
         await db.execute(
-            text("SELECT set_config('openspine.tenant_id', :t, true)").bindparams(
-                t=str(tenant_id)
-            )
+            text("SELECT set_config('openspine.tenant_id', :t, true)").bindparams(t=str(tenant_id))
         )
         ao_count = (
-            await db.execute(
-                select(IdAuthObject).where(IdAuthObject.tenant_id == tenant_id)
-            )
+            await db.execute(select(IdAuthObject).where(IdAuthObject.tenant_id == tenant_id))
         ).all()
         single_count = (
-            await db.execute(
-                select(IdRoleSingle).where(IdRoleSingle.tenant_id == tenant_id)
-            )
+            await db.execute(select(IdRoleSingle).where(IdRoleSingle.tenant_id == tenant_id))
         ).all()
         composite_count = (
-            await db.execute(
-                select(IdRoleComposite).where(IdRoleComposite.tenant_id == tenant_id)
-            )
+            await db.execute(select(IdRoleComposite).where(IdRoleComposite.tenant_id == tenant_id))
         ).all()
         sod_count = (
-            await db.execute(
-                select(IdSodRule).where(IdSodRule.tenant_id == tenant_id)
-            )
+            await db.execute(select(IdSodRule).where(IdSodRule.tenant_id == tenant_id))
         ).all()
 
     assert len(ao_count) == len(AUTH_OBJECTS)
@@ -136,9 +122,7 @@ async def test_admin_holds_system_tenant_admin_role(
     admin_id = uuid.UUID(seeded_tenant["admin_id"])
     async with SessionFactory() as db:
         await db.execute(
-            text("SELECT set_config('openspine.tenant_id', :t, true)").bindparams(
-                t=str(tenant_id)
-            )
+            text("SELECT set_config('openspine.tenant_id', :t, true)").bindparams(t=str(tenant_id))
         )
         admin_composite = (
             await db.execute(
@@ -165,9 +149,7 @@ async def test_reseeding_is_idempotent(seeded_tenant: dict[str, str]) -> None:
     admin_id = uuid.UUID(seeded_tenant["admin_id"])
 
     async with SessionFactory() as db:
-        counts = await seed_system_catalogue(
-            db, tenant_id=tenant_id, actor_principal_id=admin_id
-        )
+        counts = await seed_system_catalogue(db, tenant_id=tenant_id, actor_principal_id=admin_id)
         await db.commit()
 
     # Already seeded by the bootstrap; second pass should add nothing.
@@ -184,9 +166,7 @@ async def test_known_permissions_exist(seeded_tenant: dict[str, str]) -> None:
     tenant_id = uuid.UUID(seeded_tenant["tenant_id"])
     async with SessionFactory() as db:
         await db.execute(
-            text("SELECT set_config('openspine.tenant_id', :t, true)").bindparams(
-                t=str(tenant_id)
-            )
+            text("SELECT set_config('openspine.tenant_id', :t, true)").bindparams(t=str(tenant_id))
         )
         user_create = (
             await db.execute(
