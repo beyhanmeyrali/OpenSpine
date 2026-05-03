@@ -161,6 +161,7 @@ class IdHumanProfile(BusinessTableMixin, Base):
     __table_args__ = (
         UniqueConstraint("principal_id", name="uq_id_human_profile_principal_id"),
         UniqueConstraint("tenant_id", "email", name="uq_id_human_profile_email"),
+        Index("ix_id_human_profile_manager", "manager_principal_id"),
     )
 
     principal_id: Mapped[uuid.UUID] = mapped_column(
@@ -190,7 +191,10 @@ class IdAgentProfile(BusinessTableMixin, Base):
     """
 
     __tablename__ = "id_agent_profile"
-    __table_args__ = (UniqueConstraint("principal_id", name="uq_id_agent_profile_principal_id"),)
+    __table_args__ = (
+        UniqueConstraint("principal_id", name="uq_id_agent_profile_principal_id"),
+        Index("ix_id_agent_profile_provisioner", "provisioner_principal_id"),
+    )
 
     principal_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True),
@@ -306,6 +310,7 @@ class IdToken(BusinessTableMixin, Base):
             name="ck_id_token_agent_invariants",
         ),
         Index("ix_id_token_principal", "principal_id"),
+        Index("ix_id_token_provisioner", "provisioner_principal_id"),
     )
 
     principal_id: Mapped[uuid.UUID] = mapped_column(
@@ -402,6 +407,7 @@ class IdAuditEvent(Base):
         Index("ix_id_audit_event_tenant_action", "tenant_id", "action"),
         Index("ix_id_audit_event_trace", "trace_id"),
         Index("ix_id_audit_event_created_at", "created_at"),
+        Index("ix_id_audit_event_principal", "principal_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

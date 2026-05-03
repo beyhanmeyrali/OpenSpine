@@ -106,8 +106,19 @@ Reversal is a new row.
 
 ## Indexing
 
-Every foreign key gets an index. Postgres does not create them automatically;
-forgetting one wrecks performance on cascading reads.
+Every **navigation** foreign key gets an index — that is, every FK used to
+traverse from one entity to another (e.g. `id_credential.principal_id`,
+`md_business_partner.bp_role_id`, `fin_document_line.gl_account_id`).
+Postgres does not create them automatically, and forgetting one wrecks
+performance on cascading reads.
+
+The `created_by` / `updated_by` audit-author FKs are **not** indexed by
+default. They are write-amplification concerns on every business write,
+they are not used in routine reads, and the admin query patterns that
+need them ("show every row Amina created last week") are uncommon
+enough that the index is added when the query becomes hot, not
+prophylactically. The schema-invariants test exempts these columns
+explicitly.
 
 Beyond FKs, indexes are added for:
 
