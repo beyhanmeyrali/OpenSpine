@@ -75,10 +75,11 @@ The authentication layer produces a **principal context** — tenant, principal 
 ## Token security
 
 - Tokens are random 256-bit values, base64url-encoded, prefixed for visual identification (`osp_user_`, `osp_agent_`, `osp_svc_`).
-- Stored as `argon2id(secret)` in `id_token`. Never stored in plaintext anywhere.
+- Stored as **SHA-256(plaintext)** in `id_token.secret_hash`. Never stored in plaintext anywhere. Argon2id is reserved for low-entropy human-chosen secrets (passwords, PINs); for 256-bit cryptographic randoms it adds ~50ms per request with no security gain — SHA-256 of a 256-bit random has 2^256 preimage difficulty, which is the relevant brute-force surface here. The verification path is constant-time `hmac.compare_digest`. (Decision recorded inline in `src/openspine/identity/security.py`.)
 - On creation, the plaintext is shown once to the caller. Lost = regenerate; no recovery.
 - `id_token.last_used_at` updated on each use for staleness detection.
 - Unused tokens older than N days (configurable) can be auto-revoked.
+- Session ids follow the same shape: 256-bit random in the cookie, SHA-256 in `id_session.session_hash`. A stolen DB cannot be turned into a stolen session.
 
 ## Audit
 
