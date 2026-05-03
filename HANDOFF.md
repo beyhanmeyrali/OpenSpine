@@ -72,8 +72,8 @@ Update this list as work-streams move through their states.
 |---|--------|-------|-------|
 | 4.1 | Bootstrap | DONE | Commit `e7d9439`. 14 tests pass. |
 | 4.2 | Identity core | DONE | Ten `id_*` tables; one shared trigger function; RLS on every tenant-scoped table. Single-table `id_token` discriminated by `kind`; agent-token CHECK invariants enforced at the database. Argon2id passwords + pyotp TOTP + SHA-256-stored opaque tokens. `/auth/{login,logout,me,tokens,totp/{enrol,verify}}` HTTP surface. Principal-context middleware + RLS GUC plumbing. `openspine create-tenant` bootstrap CLI. Schema-invariants test runs against ORM metadata. 115 unit tests + 7 integration tests pass. Pending pieces (RBAC, auth-object engine, decision log) land in §4.3 as planned. |
-| 4.3 | RBAC + auth-object engine | NOT-STARTED | Identity tables now exist; this is the next critical-path item. |
-| 4.4 | Master Data core | NOT-STARTED | `tenant_id` and RLS plumbing now landed; can begin in parallel with §4.3. |
+| 4.3 | RBAC + auth-object engine | DONE | 12 RBAC tables (auth_object/_action/_qualifier, role_single/_composite/_member, permission, principal_role, sod_rule/_clause/_override, auth_decision_log). System catalogue seed (13 auth objects, 17 single roles, 4 composite roles, 4 SoD rules) loaded automatically by bootstrap_tenant_and_admin and the new `openspine seed-system-catalogue` CLI subcommand. Auth evaluator + `@requires_auth(domain, action, **extractors)` decorator with composite-role expansion, four qualifier matchers (string_list, numeric_range, amount_range, wildcard), SoD-before-allow, decision-log writes. /auth/principals/{id}/roles assign + revoke endpoints gated by ROLE_ASSIGN. 22 RBAC integration tests pass; 141/141 total. |
+| 4.4 | Master Data core | NOT-STARTED | `tenant_id`, RLS, and now the auth-object engine all in place; ready to start. |
 | 4.5 | Event bus + embedding pipeline | SKELETON DONE | Event envelope + EventBus protocol + InMemoryEventBus + glob pattern matcher (`*`/`**`); per-tenant Qdrant collection naming convention (`openspine__<tenant>`); embedding worker entrypoint subscribed to `master_data.**`. Real Redis/Qdrant clients deferred until integration tests can run. 41 tests pass. |
 | 4.6 | Plugin host | DONE (subject to §4.3/§4.4 wiring) | Discovery via Python entry points; pydantic-validated PluginManifest; PEP 440 compatibility check; three-state lifecycle; per-plugin record. Routes from manifest mounted on FastAPI app at startup. `/system/plugins` reports state. Example plugin in examples/openspine-plugin-example/. CI integration job installs core + example, runs `pytest -m integration` to verify the full discovery → manifest → hook → route pipeline. Auth-object registration and custom-field column generation are accepted in the manifest now and activate when §4.3 / §4.4 land. 67 tests pass. |
 | 4.7 | Agent surface | PARTIAL | Structured-error envelope done (core/errors.py + main.py exception handler — denial semantics ready for agent self-correction). Remaining pieces (`_meta` block on responses, agent-token shape, agent-decision-trace, hybrid /md/search) wait on §4.2 and §4.4. |
@@ -137,6 +137,11 @@ Commits on `claude/review-codebase-8XRRf`, oldest first:
 - Audit-event writer + principal-context middleware
 - Auth router + service layer + integration tests
 - Bootstrap management CLI: openspine create-tenant
+- (§4.3 work resumed 2026-05-03)
+- RBAC schema + integration-test infra fixes (v0.1 §4.3 part 1)
+- System catalogue + seeder + bootstrap auto-seed (v0.1 §4.3 part 2)
+- Auth evaluator + @requires_auth + SoD enforcement (v0.1 §4.3 part 3)
+- Role assignment endpoints + ROLE_ASSIGN gate (v0.1 §4.3 part 4)
 - (further commits land below this line)
 
 ## Open questions queued

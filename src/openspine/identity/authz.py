@@ -113,9 +113,7 @@ def _match_numeric_range(allowed_value: Any, attempted: Any) -> bool:
     max_v = allowed_value.get("max")
     if min_v is not None and att < Decimal(str(min_v)):
         return False
-    if max_v is not None and att > Decimal(str(max_v)):
-        return False
-    return True
+    return not (max_v is not None and att > Decimal(str(max_v)))
 
 
 def _match_amount_range(allowed_value: Any, attempted: Any) -> bool:
@@ -590,7 +588,7 @@ async def _load_qualifier_types(
             ).where(IdAuthObjectQualifier.auth_object_id == auth_object_id)
         )
     ).all()
-    return {qc: dt for qc, dt in rows}
+    return {qc: dt for qc, dt in rows}  # noqa: C416  (Row → tuple isn't Iterable[tuple] for mypy)
 
 
 async def _write_decision_log(

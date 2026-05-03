@@ -74,6 +74,43 @@ will fold into `0.1.0` when v0.1 ships per `docs/roadmap/v0.1-foundation.md`.
   privileged anonymous HTTP path needed. Honours
   `OPENSPINE_BOOTSTRAP_ADMIN_PASSWORD` env var; auto-generates and
   prints once otherwise.
+- **RBAC + auth-object engine (v0.1 §4.3).** Twelve more `id_*`
+  tables: auth-object catalogue (`id_auth_object` + `_action` +
+  `_qualifier`), two-tier role model (`id_role_single` +
+  `id_role_composite` + `id_role_composite_member`), permission
+  linker (`id_permission` with JSONB qualifier values), principal
+  bindings (`id_principal_role`), SoD (`id_sod_rule` + `_clause` +
+  `_override`), and append-only `id_auth_decision_log`. Migration
+  `0003_rbac_core` lands the schema, RLS policies, and BEFORE
+  UPDATE triggers.
+- **System catalogue.** A seed pack ships in
+  `openspine.identity.system_catalogue`: 13 auth objects (system
+  + sample MD/FI/MM for SoD targets), 17 system single roles, 4
+  composite roles (SYSTEM_TENANT_ADMIN, SYSTEM_AUDIT_READER,
+  SYSTEM_AI_OPERATOR, SYSTEM_PLUGIN_ADMIN), 4 SoD baseline rules
+  (AP post+pay, BP create+pay, GR+IR three-way-match, token
+  issue+audit warn rule). `seed_system_catalogue()` is idempotent
+  (keyed on `system_key`); `bootstrap_tenant_and_admin` invokes
+  it automatically and grants the admin SYSTEM_TENANT_ADMIN.
+  `openspine seed-system-catalogue --tenant-slug <slug>` re-applies
+  the catalogue after a system pack update.
+- **Authorisation evaluator.** `evaluate(ctx, domain, action,
+  qualifier_values)` walks principal → role bindings → composite
+  expansion → permissions, intersects each permission's qualifier
+  shape with the binding's scope qualifiers, runs SoD-before-allow,
+  and writes an `id_auth_decision_log` row. Four qualifier
+  matchers: `string_list`, `numeric_range`, `amount_range`,
+  `wildcard`. `enforce()` is the raising variant; `@requires_auth(
+  domain, action, **extractors)` is the FastAPI decorator. SoD
+  block-rule violation overrides any positive grant.
+- **Role-assignment HTTP surface.** `POST/DELETE
+  /auth/principals/{id}/roles[/{binding_id}]` for binding/unbinding
+  single + composite roles, gated by `system.role:assign` and
+  `system.role:revoke`. Cross-tenant attempts return 404 (no leak).
+- **Audit trace_id propagation.** Every audit row written by
+  `write_audit_event` carries `trace_id` for cross-store joins;
+  decision-log rows do the same. The middleware extracts the trace
+  id from incoming W3C `traceparent` headers when present.
 - **Council subagents.** Eight project-scoped Claude Code subagents
   (`md-expert`, `fico-expert`, `mm-expert`, `pp-expert`,
   `identity-expert`, `ai-agent-architect`, `plugin-architect`,
@@ -107,6 +144,17 @@ will fold into `0.1.0` when v0.1 ships per `docs/roadmap/v0.1-foundation.md`.
   "every FK gets an index" rule (write-amplifying on every business
   write, rare on routine reads). Schema-invariants test exempts
   these columns.
+
+### Infrastructure
+
+- **Local development stack now end-to-end testable.** `psycopg[binary]`
+  added as a sync driver for Alembic; `set_config()` replaces
+  `SET LOCAL` (which doesn't accept bind parameters) for the RLS GUC
+  in middleware / service / core; integration tests rewritten on
+  `httpx.AsyncClient + ASGITransport` so the app, the asyncpg
+  engine, and the fixtures share one event loop. pytest config
+  pins session-scoped event loops. 22 integration tests now pass
+  against a live Postgres + Qdrant stack.
 
 ### Decisions (ADRs)
 

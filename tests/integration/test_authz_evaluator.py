@@ -56,9 +56,7 @@ async def tenant_with_users() -> AsyncIterator[dict[str, str]]:
 
         # Create the three test principals + grant single roles.
         await db.execute(
-            text("SELECT set_config('openspine.tenant_id', :t, true)").bindparams(
-                t=str(tenant.id)
-            )
+            text("SELECT set_config('openspine.tenant_id', :t, true)").bindparams(t=str(tenant.id))
         )
 
         async def _make_principal(username: str) -> uuid.UUID:
@@ -118,9 +116,7 @@ async def tenant_with_users() -> AsyncIterator[dict[str, str]]:
 
     async with SessionFactory() as db:
         await db.execute(
-            text("SELECT set_config('openspine.tenant_id', :t, true)").bindparams(
-                t=str(tenant_id)
-            )
+            text("SELECT set_config('openspine.tenant_id', :t, true)").bindparams(t=str(tenant_id))
         )
         for table in (
             "id_auth_decision_log",
@@ -143,14 +139,12 @@ async def tenant_with_users() -> AsyncIterator[dict[str, str]]:
             "id_principal",
         ):
             await db.execute(
-                text(
-                    f"DELETE FROM {table} WHERE tenant_id = CAST(:t AS uuid)"
-                ).bindparams(t=str(tenant_id))
+                text(f"DELETE FROM {table} WHERE tenant_id = CAST(:t AS uuid)").bindparams(
+                    t=str(tenant_id)
+                )
             )
         await db.execute(
-            text("DELETE FROM id_tenant WHERE id = CAST(:t AS uuid)").bindparams(
-                t=str(tenant_id)
-            )
+            text("DELETE FROM id_tenant WHERE id = CAST(:t AS uuid)").bindparams(t=str(tenant_id))
         )
         await db.commit()
 
@@ -223,9 +217,7 @@ async def test_unknown_auth_object_denies(
                 t=tenant_with_users["tenant_id"]
             )
         )
-        decision = await evaluate(
-            db, ctx=ctx, domain="not.a.real.object", action="anything"
-        )
+        decision = await evaluate(db, ctx=ctx, domain="not.a.real.object", action="anything")
         await db.commit()
     assert decision.outcome == "deny"
     assert decision.reason == "unknown_auth_object"
@@ -248,9 +240,7 @@ async def test_sod_block_overrides_otherwise_valid_action(
                 t=tenant_with_users["tenant_id"]
             )
         )
-        decision = await evaluate(
-            db, ctx=ctx, domain="fi.invoice.ap", action="post"
-        )
+        decision = await evaluate(db, ctx=ctx, domain="fi.invoice.ap", action="post")
         await db.commit()
     assert decision.outcome == "sod_block"
     assert decision.reason == "sod_violation"
@@ -301,9 +291,7 @@ async def test_effective_permissions_for_admin_includes_token_issue(
                 t=tenant_with_users["tenant_id"]
             )
         )
-        perms = await load_effective_permissions(
-            db, tenant_id=tenant_id, principal_id=admin_id
-        )
+        perms = await load_effective_permissions(db, tenant_id=tenant_id, principal_id=admin_id)
     pairs = {(p.domain, p.action_code) for p in perms}
     assert ("system.token", "issue") in pairs
     assert ("system.user", "create") in pairs
@@ -330,15 +318,19 @@ async def test_decision_log_row_written_on_each_evaluate(
         await db.commit()
 
         rows = (
-            await db.execute(
-                select(IdAuthDecisionLog)
-                .where(
-                    IdAuthDecisionLog.tenant_id == ctx.tenant_id,
-                    IdAuthDecisionLog.principal_id == ctx.principal_id,
+            (
+                await db.execute(
+                    select(IdAuthDecisionLog)
+                    .where(
+                        IdAuthDecisionLog.tenant_id == ctx.tenant_id,
+                        IdAuthDecisionLog.principal_id == ctx.principal_id,
+                    )
+                    .order_by(IdAuthDecisionLog.evaluated_at.asc())
                 )
-                .order_by(IdAuthDecisionLog.evaluated_at.asc())
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
     assert len(rows) == 2
     decisions = [r.decision for r in rows]
     assert "allow" in decisions
