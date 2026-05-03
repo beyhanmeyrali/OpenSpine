@@ -37,6 +37,7 @@ from openspine.core.observability import (
 )
 from openspine.core.plugins import load_all as load_plugins
 from openspine.core.plugins import loaded_plugins
+from openspine.core.readiness import check_all as readiness_check_all
 from openspine.identity.middleware import PrincipalContextMiddleware
 from openspine.identity.router import router as identity_router
 from openspine.md.router import router as md_router
@@ -144,22 +145,18 @@ async def health() -> dict[str, str]:
 
 
 @app.get("/system/readiness", tags=["system"])
-async def readiness() -> dict[str, Any]:
-    """Readiness probe.
+async def readiness() -> Response:
+    """Readiness probe with real dependency checks.
 
-    Real implementation lands with the Postgres / Redis / Qdrant client wiring
-    in §4.2 / §4.5. v0.1 stub returns the dependencies as `unknown` so the
-    contract is in place from day one.
+    Postgres + Redis are required (down → 503). Qdrant + Ollama are
+    optional — degraded means semantic features fall back to ILIKE
+    + queue, the rest of the API serves normally.
     """
-    return {
-        "status": "ok",
-        "dependencies": {
-            "postgres": "unknown",
-            "redis": "unknown",
-            "qdrant": "unknown",
-            "ollama": "unknown",
-        },
-    }
+    settings = get_settings()
+    status_str, deps = await readiness_check_all(settings)
+    body = {"status": status_str, "version": __version__, "dependencies": deps}
+    http_status = 200 if status_str == "ready" else 503
+    return JSONResponse(content=body, status_code=http_status)
 
 
 @app.get("/system/hooks", tags=["system"])

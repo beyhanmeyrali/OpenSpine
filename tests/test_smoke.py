@@ -29,12 +29,18 @@ def test_health_endpoint() -> None:
 
 
 def test_readiness_endpoint_shape() -> None:
+    """The endpoint runs real probes against deps, so the actual status
+    depends on whether the dev stack is up. The shape contract is what
+    we lock in here: 200 if ready, 503 if not_ready, body always carries
+    `dependencies` with the four expected keys."""
     with TestClient(app) as client:
         response = client.get("/system/readiness")
-    assert response.status_code == 200
+    assert response.status_code in (200, 503)
     body = response.json()
     assert "dependencies" in body
     assert set(body["dependencies"].keys()) == {"postgres", "redis", "qdrant", "ollama"}
+    for dep in body["dependencies"].values():
+        assert dep["status"] in ("ok", "degraded", "down")
 
 
 def test_hooks_endpoint_returns_registry_shape() -> None:
