@@ -647,23 +647,34 @@ async def bootstrap_tenant_and_admin(
     from openspine.identity.seed import seed_system_catalogue
 
     await seed_system_catalogue(session, tenant_id=tenant.id, actor_principal_id=admin.id)
-    admin_composite = (
-        await session.execute(
-            select(IdRoleComposite).where(
-                IdRoleComposite.tenant_id == tenant.id,
-                IdRoleComposite.system_key == "SYSTEM_TENANT_ADMIN",
+    # MD global catalogues (currencies, rate types, UoMs) are
+    # tenant-independent — seeded once per installation. Running
+    # again is a no-op.
+    from openspine.md.global_seed import seed_md_globals
+
+    await seed_md_globals(session, actor_principal_id=admin.id)
+    # The bootstrap admin needs full system admin AND full MD admin so
+    # the day-one operator can do every operation the happy-path
+    # acceptance test exercises (tenant config, role assignment,
+    # CC/CoA/BP/material/FX/posting-period creation).
+    for composite_key in ("SYSTEM_TENANT_ADMIN", "MD_ADMIN"):
+        composite = (
+            await session.execute(
+                select(IdRoleComposite).where(
+                    IdRoleComposite.tenant_id == tenant.id,
+                    IdRoleComposite.system_key == composite_key,
+                )
+            )
+        ).scalar_one()
+        session.add(
+            IdPrincipalRole(
+                tenant_id=tenant.id,
+                principal_id=admin.id,
+                role_composite_id=composite.id,
+                created_by=admin.id,
+                updated_by=admin.id,
             )
         )
-    ).scalar_one()
-    session.add(
-        IdPrincipalRole(
-            tenant_id=tenant.id,
-            principal_id=admin.id,
-            role_composite_id=admin_composite.id,
-            created_by=admin.id,
-            updated_by=admin.id,
-        )
-    )
     await session.flush()
     return tenant, admin
 

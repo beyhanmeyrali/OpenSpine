@@ -38,6 +38,7 @@ from openspine.core.plugins import load_all as load_plugins
 from openspine.core.plugins import loaded_plugins
 from openspine.identity.middleware import PrincipalContextMiddleware
 from openspine.identity.router import router as identity_router
+from openspine.md.router import router as md_router
 
 logger = structlog.get_logger(__name__)
 
@@ -112,6 +113,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
 app.add_middleware(MetricsMiddleware)
 app.add_middleware(PrincipalContextMiddleware)
 app.include_router(identity_router)
+app.include_router(md_router)
 
 
 @app.exception_handler(OpenSpineError)

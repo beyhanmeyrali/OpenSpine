@@ -175,6 +175,44 @@ AUTH_OBJECTS: tuple[AuthObjectSeed, ...] = (
             ("amount_range", "amount_range"),
         ),
     ),
+    # Master Data — full v0.1 §4.4 surface
+    AuthObjectSeed(
+        domain="md.company_code",
+        description="Manage Company Code master records.",
+        actions=("create", "change", "display"),
+        qualifiers=(("company_code", "string_list"),),
+    ),
+    AuthObjectSeed(
+        domain="md.plant",
+        description="Manage Plant master records.",
+        actions=("create", "change", "display"),
+        qualifiers=(
+            ("plant", "string_list"),
+            ("company_code", "string_list"),
+        ),
+    ),
+    AuthObjectSeed(
+        domain="md.chart_of_accounts",
+        description="Manage Chart of Accounts header.",
+        actions=("create", "change", "display"),
+    ),
+    AuthObjectSeed(
+        domain="md.fx_rate",
+        description="Upload and maintain FX rates.",
+        actions=("upload", "display"),
+        qualifiers=(("rate_type", "string_list"),),
+    ),
+    AuthObjectSeed(
+        domain="md.posting_period",
+        description="Open and close posting periods.",
+        actions=("open", "close", "display"),
+        qualifiers=(("company_code", "string_list"),),
+    ),
+    AuthObjectSeed(
+        domain="md.number_range",
+        description="Maintain number range definitions.",
+        actions=("create", "change", "display"),
+    ),
 )
 
 
@@ -261,13 +299,19 @@ SINGLE_ROLES: tuple[SingleRoleSeed, ...] = (
         code="MD_BP_CREATE",
         description="Create business partner records.",
         module="md",
-        permissions=(PermissionSeed("md.business_partner", "create"),),
+        permissions=(
+            PermissionSeed("md.business_partner", "create"),
+            PermissionSeed("md.business_partner", "display"),
+        ),
     ),
     SingleRoleSeed(
         code="MD_BP_CHANGE",
         description="Change business partner records.",
         module="md",
-        permissions=(PermissionSeed("md.business_partner", "change"),),
+        permissions=(
+            PermissionSeed("md.business_partner", "change"),
+            PermissionSeed("md.business_partner", "display"),
+        ),
     ),
     SingleRoleSeed(
         code="FI_AP_INVOICE_POST",
@@ -292,6 +336,78 @@ SINGLE_ROLES: tuple[SingleRoleSeed, ...] = (
         description="Post invoice receipts (MM verification).",
         module="mm",
         permissions=(PermissionSeed("mm.invoice_receipt", "post"),),
+    ),
+    # Master Data single roles for §4.4
+    SingleRoleSeed(
+        code="MD_COMPANY_CODE_MAINTAIN",
+        description="Create and change Company Code master.",
+        module="md",
+        permissions=(
+            PermissionSeed("md.company_code", "create"),
+            PermissionSeed("md.company_code", "change"),
+            PermissionSeed("md.company_code", "display"),
+        ),
+    ),
+    SingleRoleSeed(
+        code="MD_PLANT_MAINTAIN",
+        description="Create and change Plant master.",
+        module="md",
+        permissions=(
+            PermissionSeed("md.plant", "create"),
+            PermissionSeed("md.plant", "change"),
+            PermissionSeed("md.plant", "display"),
+        ),
+    ),
+    SingleRoleSeed(
+        code="MD_COA_MAINTAIN",
+        description="Create and change Chart of Accounts.",
+        module="md",
+        permissions=(
+            PermissionSeed("md.chart_of_accounts", "create"),
+            PermissionSeed("md.chart_of_accounts", "change"),
+        ),
+    ),
+    SingleRoleSeed(
+        code="MD_GL_ACCOUNT_MAINTAIN",
+        description="Create and change GL accounts.",
+        module="md",
+        permissions=(
+            PermissionSeed("md.gl_account", "create"),
+            PermissionSeed("md.gl_account", "change"),
+        ),
+    ),
+    SingleRoleSeed(
+        code="MD_MATERIAL_MAINTAIN",
+        description="Create and change material master.",
+        module="md",
+        permissions=(
+            PermissionSeed("md.material", "create"),
+            PermissionSeed("md.material", "change"),
+        ),
+    ),
+    SingleRoleSeed(
+        code="MD_FX_RATE_UPLOAD",
+        description="Upload exchange rates.",
+        module="md",
+        permissions=(PermissionSeed("md.fx_rate", "upload"),),
+    ),
+    SingleRoleSeed(
+        code="MD_POSTING_PERIOD_MAINTAIN",
+        description="Open and close posting periods.",
+        module="md",
+        permissions=(
+            PermissionSeed("md.posting_period", "open"),
+            PermissionSeed("md.posting_period", "close"),
+        ),
+    ),
+    SingleRoleSeed(
+        code="MD_NUMBER_RANGE_MAINTAIN",
+        description="Maintain number range definitions.",
+        module="md",
+        permissions=(
+            PermissionSeed("md.number_range", "create"),
+            PermissionSeed("md.number_range", "change"),
+        ),
     ),
 )
 
@@ -332,6 +448,31 @@ COMPOSITE_ROLES: tuple[CompositeRoleSeed, ...] = (
         code="SYSTEM_PLUGIN_ADMIN",
         description="Plugin lifecycle management.",
         members=("PLUGIN_INSTALL", "PLUGIN_CONFIGURE"),
+    ),
+    CompositeRoleSeed(
+        code="MD_ADMIN",
+        description="Full master-data administration.",
+        members=(
+            "MD_COMPANY_CODE_MAINTAIN",
+            "MD_PLANT_MAINTAIN",
+            "MD_COA_MAINTAIN",
+            "MD_GL_ACCOUNT_MAINTAIN",
+            "MD_MATERIAL_MAINTAIN",
+            "MD_BP_CREATE",
+            "MD_BP_CHANGE",
+            "MD_FX_RATE_UPLOAD",
+            "MD_POSTING_PERIOD_MAINTAIN",
+            "MD_NUMBER_RANGE_MAINTAIN",
+        ),
+    ),
+    CompositeRoleSeed(
+        code="MD_STEWARD",
+        description="Day-to-day master-data maintenance.",
+        members=(
+            "MD_BP_CREATE",
+            "MD_BP_CHANGE",
+            "MD_MATERIAL_MAINTAIN",
+        ),
     ),
 )
 

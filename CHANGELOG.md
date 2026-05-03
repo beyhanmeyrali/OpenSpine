@@ -111,6 +111,45 @@ will fold into `0.1.0` when v0.1 ships per `docs/roadmap/v0.1-foundation.md`.
   `write_audit_event` carries `trace_id` for cross-store joins;
   decision-log rows do the same. The middleware extracts the trace
   id from incoming W3C `traceparent` headers when present.
+- **Master Data core (v0.1 §4.4).** Twenty-seven `md_*` tables.
+  Global catalogues (no tenant_id, no RLS): `md_currency`,
+  `md_exchange_rate_type`, `md_uom`, `md_uom_conversion`. The
+  remaining 23 tenant-scoped: org structure
+  (`md_company_code`, `md_plant`, `md_storage_location`,
+  `md_purchasing_org`, `md_purchasing_group`, `md_controlling_area`),
+  calendars (`md_factory_calendar`, `md_fiscal_year_variant`,
+  `md_posting_period`), CoA + GL master (`md_chart_of_accounts`,
+  `md_account_group`, `md_gl_account`, `md_gl_account_company`),
+  Business Partner (`md_business_partner`, `md_bp_role`,
+  `md_bp_address`, `md_bp_bank`), Material
+  (`md_material`, `md_material_plant`, `md_material_valuation`,
+  `md_material_uom`), `md_fx_rate`, `md_number_range`.
+- **MD global catalogue seeded at bootstrap.** 20 ISO 4217
+  currencies, 3 FX rate types (M/B/G), 20 UoMs (EA, KG, M, L, etc.).
+  `seed_md_globals()` is idempotent and runs as part of
+  `bootstrap_tenant_and_admin`.
+- **System auth-object catalogue extended.** Six new MD auth
+  objects (`md.company_code`, `md.plant`, `md.chart_of_accounts`,
+  `md.fx_rate`, `md.posting_period`, `md.number_range` — joining
+  the existing `md.business_partner`, `md.material`,
+  `md.gl_account`). Eight MD single roles (one per maintenance
+  area). Two new composites: `MD_ADMIN` (full master-data admin)
+  and `MD_STEWARD` (day-to-day BP/material maintenance). The
+  bootstrap admin gets both `SYSTEM_TENANT_ADMIN` and `MD_ADMIN`.
+- **Master Data service layer + HTTP surface.** CRUD service
+  functions in `openspine.md.service` and FastAPI routes under
+  `/md/*`: currencies, UoMs, fiscal-year-variants, charts-of-accounts,
+  gl-accounts, company-codes, plants, business-partners (+ get by
+  id), materials (+ plant/valuation extensions), fx-rates,
+  posting-periods (create + state-toggle). Every mutating route
+  gated via `enforce()`. Tenant-scoped number-range allocation
+  uses `SELECT ... FOR UPDATE` for safe concurrency.
+- **v0.1 §3 acceptance happy-path test.** End-to-end: bootstrap
+  tenant + admin → fiscal-year-variant → CoA → 3 GL accounts →
+  Company Code → Plant → vendor BP (with role + address) →
+  Material (+ plant + valuation views) → FX rate → posting period
+  open → close → reopen. All against the live HTTP surface with
+  a real Postgres.
 - **Council subagents.** Eight project-scoped Claude Code subagents
   (`md-expert`, `fico-expert`, `mm-expert`, `pp-expert`,
   `identity-expert`, `ai-agent-architect`, `plugin-architect`,
