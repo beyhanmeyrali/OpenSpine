@@ -512,8 +512,8 @@ COMPOSITE_ROLES: tuple[CompositeRoleSeed, ...] = (
     ),
     CompositeRoleSeed(
         code="FI_GL_ACCOUNTANT",
-        description="Posts and reviews universal-journal documents.",
-        members=("FI_DOCUMENT_POST", "FI_DOCUMENT_DISPLAY"),
+        description="Posts, reviews, and reverses universal-journal documents.",
+        members=("FI_DOCUMENT_POST", "FI_DOCUMENT_REVERSE", "FI_DOCUMENT_DISPLAY"),
     ),
     CompositeRoleSeed(
         code="FI_VIEWER",

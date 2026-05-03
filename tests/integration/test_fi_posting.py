@@ -506,6 +506,256 @@ async def test_unknown_document_type_is_rejected(
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Reverse + display
+# ---------------------------------------------------------------------------
+
+
+async def test_reverse_round_trip_links_originals_and_swaps_signs(
+    fi_ready_tenant: dict[str, str],
+) -> None:
+    """Post a balanced JE, reverse it, verify:
+    - reversal AB document is balanced too (debit/credit swap)
+    - both rows now status='reversed'
+    - reversal_of_id ↔ reversed_by_id cross-pointers wired
+    - finance.document.reversed event would have fired (not asserted here)
+    """
+    bundle = fi_ready_tenant
+    client: AsyncClient = bundle["client"]  # type: ignore[assignment]
+
+    posted = await client.post(
+        "/fi/journal-entries",
+        json={
+            "company_code_id": bundle["company_code_id"],
+            "document_type_code": "SA",
+            "posting_date": str(date(2026, 5, 17)),
+            "document_date": str(date(2026, 5, 17)),
+            "fiscal_year": 2026,
+            "period": 5,
+            "lines": [
+                {
+                    "gl_account_id": bundle["gl_cash"],
+                    "debit_credit": "D",
+                    "amount_local": "777.00",
+                    "local_currency_id": bundle["eur_id"],
+                },
+                {
+                    "gl_account_id": bundle["gl_revenue"],
+                    "debit_credit": "C",
+                    "amount_local": "777.00",
+                    "local_currency_id": bundle["eur_id"],
+                },
+            ],
+        },
+    )
+    assert posted.status_code == 201
+    original_id = posted.json()["id"]
+
+    rev = await client.post(
+        f"/fi/journal-entries/{original_id}/reverse",
+        json={
+            "posting_date": str(date(2026, 5, 18)),
+            "fiscal_year": 2026,
+            "period": 5,
+            "reason": "duplicate posting — entered by mistake",
+        },
+    )
+    assert rev.status_code == 201, rev.text
+    rev_body = rev.json()
+    assert rev_body["document_type"] == "AB"
+    assert rev_body["_meta"]["is_reversal"] is True
+    assert rev_body["_meta"]["related"]["reversal_of"].endswith(original_id)
+    rev_id = rev_body["id"]
+
+    # Verify cross-pointers + statuses via DB.
+    tenant_id = uuid.UUID(bundle["tenant_id"])
+    async with SessionFactory() as db:
+        await db.execute(
+            text("SELECT set_config('openspine.tenant_id', :t, true)").bindparams(
+                t=str(tenant_id)
+            )
+        )
+        original = await db.get(FinDocumentHeader, uuid.UUID(original_id))
+        reversal = await db.get(FinDocumentHeader, uuid.UUID(rev_id))
+        rev_lines = (
+            (
+                await db.execute(
+                    select(FinDocumentLine).where(
+                        FinDocumentLine.document_header_id == reversal.id
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    assert original.status == "reversed"
+    assert reversal.status == "reversed"
+    assert original.reversed_by_id == reversal.id
+    assert reversal.reversal_of_id == original.id
+    # Original was D-cash / C-revenue; reversal must swap.
+    debit_acct = next(
+        line.gl_account_id for line in rev_lines if line.debit_credit == "D"
+    )
+    credit_acct = next(
+        line.gl_account_id for line in rev_lines if line.debit_credit == "C"
+    )
+    assert str(debit_acct) == bundle["gl_revenue"]
+    assert str(credit_acct) == bundle["gl_cash"]
+
+
+async def test_double_reverse_is_blocked(
+    fi_ready_tenant: dict[str, str],
+) -> None:
+    bundle = fi_ready_tenant
+    client: AsyncClient = bundle["client"]  # type: ignore[assignment]
+
+    posted = await client.post(
+        "/fi/journal-entries",
+        json={
+            "company_code_id": bundle["company_code_id"],
+            "document_type_code": "SA",
+            "posting_date": str(date(2026, 5, 19)),
+            "document_date": str(date(2026, 5, 19)),
+            "fiscal_year": 2026,
+            "period": 5,
+            "lines": [
+                {
+                    "gl_account_id": bundle["gl_cash"],
+                    "debit_credit": "D",
+                    "amount_local": "50.00",
+                    "local_currency_id": bundle["eur_id"],
+                },
+                {
+                    "gl_account_id": bundle["gl_revenue"],
+                    "debit_credit": "C",
+                    "amount_local": "50.00",
+                    "local_currency_id": bundle["eur_id"],
+                },
+            ],
+        },
+    )
+    original_id = posted.json()["id"]
+    rev = await client.post(
+        f"/fi/journal-entries/{original_id}/reverse",
+        json={
+            "posting_date": str(date(2026, 5, 20)),
+            "fiscal_year": 2026,
+            "period": 5,
+        },
+    )
+    assert rev.status_code == 201
+    again = await client.post(
+        f"/fi/journal-entries/{original_id}/reverse",
+        json={
+            "posting_date": str(date(2026, 5, 20)),
+            "fiscal_year": 2026,
+            "period": 5,
+        },
+    )
+    assert again.status_code == 409
+    assert again.json()["reason"] == "document_not_reversible"
+
+
+async def test_get_document_returns_lines_and_meta(
+    fi_ready_tenant: dict[str, str],
+) -> None:
+    bundle = fi_ready_tenant
+    client: AsyncClient = bundle["client"]  # type: ignore[assignment]
+    posted = await client.post(
+        "/fi/journal-entries",
+        json={
+            "company_code_id": bundle["company_code_id"],
+            "document_type_code": "SA",
+            "posting_date": str(date(2026, 5, 21)),
+            "document_date": str(date(2026, 5, 21)),
+            "fiscal_year": 2026,
+            "period": 5,
+            "lines": [
+                {
+                    "gl_account_id": bundle["gl_cash"],
+                    "debit_credit": "D",
+                    "amount_local": "12.00",
+                    "local_currency_id": bundle["eur_id"],
+                },
+                {
+                    "gl_account_id": bundle["gl_revenue"],
+                    "debit_credit": "C",
+                    "amount_local": "12.00",
+                    "local_currency_id": bundle["eur_id"],
+                },
+            ],
+        },
+    )
+    doc_id = posted.json()["id"]
+    fetched = await client.get(f"/fi/journal-entries/{doc_id}")
+    assert fetched.status_code == 200
+    body = fetched.json()
+    assert body["line_count"] == 2
+    assert body["_meta"]["status"] == "posted"
+    actions = {a["name"] for a in body["_meta"].get("actions", [])}
+    assert "reverse" in actions
+
+
+async def test_list_documents_by_period(
+    fi_ready_tenant: dict[str, str],
+) -> None:
+    bundle = fi_ready_tenant
+    client: AsyncClient = bundle["client"]  # type: ignore[assignment]
+    # Post two more so the listing has multiple rows.
+    for amount in ("100.00", "200.00"):
+        await client.post(
+            "/fi/journal-entries",
+            json={
+                "company_code_id": bundle["company_code_id"],
+                "document_type_code": "SA",
+                "posting_date": str(date(2026, 5, 22)),
+                "document_date": str(date(2026, 5, 22)),
+                "fiscal_year": 2026,
+                "period": 5,
+                "lines": [
+                    {
+                        "gl_account_id": bundle["gl_cash"],
+                        "debit_credit": "D",
+                        "amount_local": amount,
+                        "local_currency_id": bundle["eur_id"],
+                    },
+                    {
+                        "gl_account_id": bundle["gl_revenue"],
+                        "debit_credit": "C",
+                        "amount_local": amount,
+                        "local_currency_id": bundle["eur_id"],
+                    },
+                ],
+            },
+        )
+    listing = await client.get(
+        "/fi/journal-entries",
+        params={
+            "company_code_id": bundle["company_code_id"],
+            "fiscal_year": 2026,
+            "period": 5,
+        },
+    )
+    assert listing.status_code == 200
+    body = listing.json()
+    assert body["total"] >= 2
+    # Ordered by document number ascending.
+    numbers = [item["document_number"] for item in body["items"]]
+    assert numbers == sorted(numbers)
+
+
+async def test_get_unknown_document_returns_404(
+    fi_ready_tenant: dict[str, str],
+) -> None:
+    bundle = fi_ready_tenant
+    client: AsyncClient = bundle["client"]  # type: ignore[assignment]
+    bogus = str(uuid.uuid4())
+    response = await client.get(f"/fi/journal-entries/{bogus}")
+    assert response.status_code == 404
+    assert response.json()["reason"] == "document_not_in_tenant"
+
+
 async def test_principal_without_fi_post_role_is_denied(
     fi_ready_tenant: dict[str, str],
 ) -> None:

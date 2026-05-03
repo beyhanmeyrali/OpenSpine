@@ -441,9 +441,179 @@ async def post_journal_entry(
     return PostedJournalEntry(header=header, lines=line_rows)
 
 
+# ---------------------------------------------------------------------------
+# Reverse
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ReverseRequest:
+    """Inputs for reversing a posted document.
+
+    `posting_date` defaults to the current date; the reversal can land
+    in the original period (if still open) or in a later open period
+    if the original's period has been closed since posting.
+    """
+
+    posting_date: date
+    fiscal_year: int
+    period: int
+    reason: str | None = None
+
+
+async def reverse_journal_entry(
+    session: AsyncSession,
+    *,
+    tenant_id: uuid.UUID,
+    actor_principal_id: uuid.UUID,
+    original_id: uuid.UUID,
+    request: ReverseRequest,
+) -> PostedJournalEntry:
+    """Reverse `original_id` by posting a new AB-type document with
+    D/C swapped on every line. Both rows end up `status='reversed'`
+    with cross-pointers (`reversal_of_id` / `reversed_by_id`).
+
+    Per `fi-finance.md` §"Reversals & corrections": the original is
+    NEVER deleted or mutated in-place beyond the back-pointer +
+    status flip. The reversal is a complete posting in its own
+    right, going through the same balance / period / GL / number
+    checks as any other.
+    """
+    # Load the original.
+    original = await session.get(FinDocumentHeader, original_id)
+    if original is None or original.tenant_id != tenant_id:
+        raise NotFoundError(
+            "document not found",
+            domain="fi.document",
+            action="reverse",
+            reason="document_not_in_tenant",
+        )
+    if original.status != "posted":
+        raise ConflictError(
+            f"document is {original.status!r}; only 'posted' can be reversed",
+            domain="fi.document",
+            action="reverse",
+            reason="document_not_reversible",
+            attempted={"status": original.status},
+        )
+
+    # Find the AB reversal document type for this tenant.
+    ab_type = (
+        await session.execute(
+            select(FinDocumentType).where(
+                FinDocumentType.tenant_id == tenant_id,
+                FinDocumentType.is_reversal.is_(True),
+            )
+        )
+    ).scalar_one_or_none()
+    if ab_type is None:
+        raise ConflictError(
+            "no reversal document type configured for tenant",
+            domain="fi.document",
+            action="reverse",
+            reason="no_reversal_document_type",
+        )
+
+    # Load the original's lines.
+    original_lines = (
+        (
+            await session.execute(
+                select(FinDocumentLine).where(FinDocumentLine.document_header_id == original.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    # Pre-reverse hook (plugin extension point — can abort).
+    await dispatch_pre(
+        "journal_entry.pre_reverse",
+        {
+            "original_id": str(original.id),
+            "original_document_number": original.document_number,
+            "company_code_id": str(original.company_code_id),
+            "reverse_posting_date": request.posting_date.isoformat(),
+            "reverse_fiscal_year": request.fiscal_year,
+            "reverse_period": request.period,
+            "reason": request.reason,
+        },
+    )
+
+    # Build a JournalEntryInput with D/C swapped and post it through
+    # the standard path so balance/period/GL checks all run.
+    swapped_lines = [
+        JournalLineInput(
+            gl_account_id=line.gl_account_id,
+            debit_credit="C" if line.debit_credit == "D" else "D",
+            amount_local=line.amount_local,
+            local_currency_id=line.local_currency_id,
+            ledger_id=line.ledger_id,
+            business_partner_id=line.business_partner_id,
+            cost_centre_id=line.cost_centre_id,
+            profit_centre_code=line.profit_centre_code,
+            internal_order_code=line.internal_order_code,
+            segment_code=line.segment_code,
+            project_code=line.project_code,
+            tax_code=line.tax_code,
+            line_text=(
+                f"Reversal of doc {original.document_number}"
+                if not line.line_text
+                else f"Reversal of: {line.line_text}"
+            ),
+            line_metadata=line.line_metadata,
+        )
+        for line in original_lines
+    ]
+    reversal_entry = JournalEntryInput(
+        company_code_id=original.company_code_id,
+        document_type_code=ab_type.code,
+        posting_date=request.posting_date,
+        document_date=request.posting_date,
+        fiscal_year=request.fiscal_year,
+        period=request.period,
+        reference=f"REV-{original.document_number}",
+        header_text=request.reason or f"Reversal of document {original.document_number}",
+        lines=swapped_lines,
+    )
+    posted = await post_journal_entry(
+        session,
+        tenant_id=tenant_id,
+        actor_principal_id=actor_principal_id,
+        entry=reversal_entry,
+    )
+
+    # Wire the back-pointers + flip statuses.
+    posted.header.reversal_of_id = original.id
+    posted.header.status = "reversed"
+    original.reversed_by_id = posted.header.id
+    original.status = "reversed"
+    await session.flush()
+
+    # Publish the reversal-specific event so subscribers can react
+    # without rescanning the journal.
+    bus = get_event_bus()
+    await bus.publish(
+        Event(
+            stream="finance.document.reversed",
+            tenant_id=str(tenant_id),
+            payload={
+                "original_id": str(original.id),
+                "original_document_number": original.document_number,
+                "reversal_id": str(posted.header.id),
+                "reversal_document_number": posted.header.document_number,
+                "reason": request.reason,
+            },
+        )
+    )
+
+    return posted
+
+
 __all__ = [
     "JournalEntryInput",
     "JournalLineInput",
     "PostedJournalEntry",
+    "ReverseRequest",
     "post_journal_entry",
+    "reverse_journal_entry",
 ]

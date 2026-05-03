@@ -158,6 +158,7 @@ Commits on `claude/review-codebase-8XRRf`, oldest first:
 - Embeddings switched to qwen3-embedding:0.6b via OpenAI /v1/embeddings
 - (v0.2 work begins 2026-05-03 — beyond v0.1 acceptance criteria)
 - FI universal journal + co_cost_centre + posting service + /fi/journal-entries
+- FI document reverse + display (GET single, list-by-period)
 - (further commits land below this line)
 
 ## Open questions queued
