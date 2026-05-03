@@ -18,6 +18,7 @@ from openspine.core.database import metadata
 # tables on the shared `metadata`. Without these imports, --autogenerate
 # would think the schema is empty.
 import openspine.identity  # noqa: F401, E402  (registration side-effect)
+import openspine.md  # noqa: F401, E402  (registration side-effect)
 
 config = context.config
 if config.config_file_name is not None:

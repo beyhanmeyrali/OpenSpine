@@ -21,25 +21,33 @@ as they land in §4.4.
 
 from __future__ import annotations
 
-import openspine.identity  # noqa: F401  (registers identity tables on metadata)
+import openspine.identity
+import openspine.md  # noqa: F401  (registers md tables on metadata)
 from openspine.core.database import metadata
 from openspine.identity.models import TABLES_WITH_RLS, TABLES_WITH_UPDATE_TRIGGER
 from openspine.identity.rbac_models import (
     RBAC_TABLES_WITH_RLS,
     RBAC_TABLES_WITH_UPDATE_TRIGGER,
 )
+from openspine.md.models import (
+    MD_GLOBAL_TABLES,
+    MD_TABLES_WITH_UPDATE_TRIGGER,
+    MD_TENANT_TABLES,
+)
 
 _ALL_TABLES_WITH_UPDATE_TRIGGER = (
     *TABLES_WITH_UPDATE_TRIGGER,
     *RBAC_TABLES_WITH_UPDATE_TRIGGER,
+    *MD_TABLES_WITH_UPDATE_TRIGGER,
 )
-_ALL_TABLES_WITH_RLS = (*TABLES_WITH_RLS, *RBAC_TABLES_WITH_RLS)
+_ALL_TABLES_WITH_RLS = (*TABLES_WITH_RLS, *RBAC_TABLES_WITH_RLS, *MD_TENANT_TABLES)
 
 # Tables that legitimately do not carry `tenant_id` (and therefore have
 # no tenant-isolation RLS policy). Listed by table name.
 _GLOBAL_CATALOGUES: frozenset[str] = frozenset(
     {
         "id_tenant",  # global tenant registry
+        *MD_GLOBAL_TABLES,  # md_currency, md_uom, etc. — universal catalogues
     }
 )
 
@@ -200,14 +208,18 @@ def test_no_unknown_table_prefixes() -> None:
         )
 
 
+_TRACKED_PREFIXES = ("id_", "md_")
+
+
 def test_trigger_table_list_matches_update_audit_tables() -> None:
-    """Every table that has `updated_at` + `version` should be in
-    TABLES_WITH_UPDATE_TRIGGER. Catches drift between the model file and
-    the migration's trigger-attachment loop.
+    """Every business table with `updated_at` + `version` should be in
+    one of the per-module update-trigger registries. Catches drift
+    between the model files and the migrations' trigger-attachment
+    loops.
     """
     expected: set[str] = set()
     for name in _all_business_tables():
-        if not name.startswith("id_"):
+        if not name.startswith(_TRACKED_PREFIXES):
             continue
         cols = {c.name for c in metadata.tables[name].columns}
         if {"updated_at", "version"} <= cols:
@@ -220,12 +232,12 @@ def test_trigger_table_list_matches_update_audit_tables() -> None:
 
 
 def test_rls_table_list_includes_all_tenant_scoped_id_tables() -> None:
-    """Every `id_*` table that carries `tenant_id` is in TABLES_WITH_RLS.
-    `id_tenant` is excluded by design.
+    """Every tenant-scoped business table is registered for RLS.
+    Global catalogues (id_tenant, md_currency, md_uom, etc.) are excluded.
     """
     expected: set[str] = set()
     for name in _all_business_tables():
-        if not name.startswith("id_"):
+        if not name.startswith(_TRACKED_PREFIXES):
             continue
         if name in _GLOBAL_CATALOGUES:
             continue
