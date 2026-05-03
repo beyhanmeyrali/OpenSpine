@@ -112,6 +112,11 @@ async def tenant_with_admin_and_agent() -> AsyncIterator[dict[str, str]]:
             text("SELECT set_config('openspine.tenant_id', :t, true)").bindparams(t=str(tenant_id))
         )
         for table in (
+            "fin_document_line",
+            "fin_document_header",
+            "fin_document_type",
+            "fin_ledger",
+            "co_cost_centre",
             "id_agent_decision_trace",
             "md_material_uom",
             "md_material_valuation",

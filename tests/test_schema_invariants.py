@@ -21,9 +21,13 @@ as they land in §4.4.
 
 from __future__ import annotations
 
+import openspine.co
+import openspine.fi
 import openspine.identity
 import openspine.md  # noqa: F401  (registers md tables on metadata)
+from openspine.co.models import CO_TABLES_WITH_RLS, CO_TABLES_WITH_UPDATE_TRIGGER
 from openspine.core.database import metadata
+from openspine.fi.models import FIN_TABLES_WITH_RLS, FIN_TABLES_WITH_UPDATE_TRIGGER
 from openspine.identity.models import TABLES_WITH_RLS, TABLES_WITH_UPDATE_TRIGGER
 from openspine.identity.rbac_models import (
     RBAC_TABLES_WITH_RLS,
@@ -39,8 +43,16 @@ _ALL_TABLES_WITH_UPDATE_TRIGGER = (
     *TABLES_WITH_UPDATE_TRIGGER,
     *RBAC_TABLES_WITH_UPDATE_TRIGGER,
     *MD_TABLES_WITH_UPDATE_TRIGGER,
+    *FIN_TABLES_WITH_UPDATE_TRIGGER,
+    *CO_TABLES_WITH_UPDATE_TRIGGER,
 )
-_ALL_TABLES_WITH_RLS = (*TABLES_WITH_RLS, *RBAC_TABLES_WITH_RLS, *MD_TENANT_TABLES)
+_ALL_TABLES_WITH_RLS = (
+    *TABLES_WITH_RLS,
+    *RBAC_TABLES_WITH_RLS,
+    *MD_TENANT_TABLES,
+    *FIN_TABLES_WITH_RLS,
+    *CO_TABLES_WITH_RLS,
+)
 
 # Tables that legitimately do not carry `tenant_id` (and therefore have
 # no tenant-isolation RLS policy). Listed by table name.
@@ -68,13 +80,28 @@ _APPEND_ONLY: frozenset[str] = frozenset(
         # ("why did the agent do X"). Carries created_at + principal_id
         # (the agent) but no created_by — same pattern as the decision log.
         "id_agent_decision_trace",
+        # The universal journal is reversal-by-new-row per ADR 0003 +
+        # data-model.md. Header carries created_at + created_by;
+        # lines too. Neither row is ever updated.
+        "fin_document_header",
+        "fin_document_line",
     }
 )
 
 # Append-only tables where the standard `created_by` column isn't
 # carried, because the row's `principal_id` (the actor) already serves
 # that role and a separate created_by would always be redundant.
-_NO_AUDIT_COLUMNS: frozenset[str] = frozenset({"id_auth_decision_log", "id_agent_decision_trace"})
+# Append-only tables that substitute their own domain-specific
+# columns for `created_at` / `created_by`. Listed explicitly:
+# - id_auth_decision_log: uses `evaluated_at`; `principal_id` is
+#   the actor, no separate `created_by`.
+# - id_agent_decision_trace: same pattern.
+# - fin_document_header: uses `entry_date` (when the bookkeeper
+#   entered the document) instead of `created_at`. Carries
+#   `created_by` per data-model.md.
+_NO_AUDIT_COLUMNS: frozenset[str] = frozenset(
+    {"id_auth_decision_log", "id_agent_decision_trace", "fin_document_header"}
+)
 
 # Allowed table prefixes per data-model.md. `alembic_version` is the
 # Alembic bookkeeping table, exempted.
@@ -212,7 +239,7 @@ def test_no_unknown_table_prefixes() -> None:
         )
 
 
-_TRACKED_PREFIXES = ("id_", "md_")
+_TRACKED_PREFIXES = ("id_", "md_", "fin_", "co_")
 
 
 def test_trigger_table_list_matches_update_audit_tables() -> None:

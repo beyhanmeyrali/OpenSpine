@@ -1,0 +1,184 @@
+"""FI HTTP surface — `/fi/*`.
+
+POST /fi/journal-entries — direct universal-journal posting. The
+v0.2 cut covers the GL posting path (document type `SA`); AP/AR
+specifics arrive when the open-item + clearing tables land.
+
+Authority gate: `fi.document:post`. The amount_range qualifier on
+the auth object will eventually compare the entry's total debit
+against the principal's per-posting limit; v0.2 ships the gate
+without the FX-converted amount check (lands when the FX rate
+service plugs into the evaluator).
+"""
+
+from __future__ import annotations
+
+import uuid
+from datetime import date
+from decimal import Decimal
+from typing import Any
+
+from fastapi import APIRouter, Request, status
+from pydantic import BaseModel, Field
+
+from openspine.agents.meta import build_meta_block
+from openspine.core.errors import AuthenticationError
+from openspine.fi.service import (
+    JournalEntryInput,
+    JournalLineInput,
+    post_journal_entry,
+)
+from openspine.identity.authz import enforce
+from openspine.identity.context import PrincipalContext
+from openspine.identity.middleware import get_request_session
+
+router = APIRouter(prefix="/fi", tags=["finance"])
+
+
+class JournalLineIn(BaseModel):
+    gl_account_id: uuid.UUID
+    debit_credit: str = Field(description="'D' or 'C'")
+    amount_local: Decimal
+    local_currency_id: uuid.UUID
+    ledger_id: uuid.UUID | None = None
+    business_partner_id: uuid.UUID | None = None
+    cost_centre_id: uuid.UUID | None = None
+    profit_centre_code: str | None = None
+    internal_order_code: str | None = None
+    segment_code: str | None = None
+    project_code: str | None = None
+    tax_code: str | None = None
+    line_text: str | None = None
+    line_metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class JournalEntryIn(BaseModel):
+    company_code_id: uuid.UUID
+    document_type_code: str = "SA"
+    posting_date: date
+    document_date: date
+    fiscal_year: int
+    period: int
+    lines: list[JournalLineIn] = Field(min_length=2)
+    reference: str | None = None
+    header_text: str | None = None
+
+
+class JournalLineOut(BaseModel):
+    id: uuid.UUID
+    line_number: int
+    gl_account_id: uuid.UUID
+    debit_credit: str
+    amount_local: Decimal
+
+
+class JournalEntryOut(BaseModel):
+    id: uuid.UUID
+    document_number: int
+    document_type: str
+    company_code_id: uuid.UUID
+    fiscal_year: int
+    period: int
+    posting_date: date
+    line_count: int
+    lines: list[JournalLineOut]
+    meta: dict[str, Any] | None = Field(default=None, alias="_meta")
+
+    model_config = {"populate_by_name": True}
+
+
+def _ctx(request: Request) -> PrincipalContext:
+    ctx: PrincipalContext = getattr(request.state, "principal_context", None) or (
+        PrincipalContext.anonymous(trace_id=uuid.uuid4())
+    )
+    if ctx.is_anonymous:
+        raise AuthenticationError(
+            "authentication required",
+            domain="auth",
+            action="access",
+            reason="not_authenticated",
+        )
+    return ctx
+
+
+@router.post(
+    "/journal-entries",
+    response_model=JournalEntryOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def post_journal_entry_endpoint(payload: JournalEntryIn, request: Request) -> JournalEntryOut:
+    ctx = _ctx(request)
+    session = get_request_session()
+    await enforce(session, ctx=ctx, domain="fi.document", action="post")
+    assert ctx.tenant_id is not None
+    assert ctx.principal_id is not None
+    result = await post_journal_entry(
+        session,
+        tenant_id=ctx.tenant_id,
+        actor_principal_id=ctx.principal_id,
+        entry=JournalEntryInput(
+            company_code_id=payload.company_code_id,
+            document_type_code=payload.document_type_code,
+            posting_date=payload.posting_date,
+            document_date=payload.document_date,
+            fiscal_year=payload.fiscal_year,
+            period=payload.period,
+            reference=payload.reference,
+            header_text=payload.header_text,
+            lines=[
+                JournalLineInput(
+                    gl_account_id=line.gl_account_id,
+                    debit_credit=line.debit_credit,
+                    amount_local=line.amount_local,
+                    local_currency_id=line.local_currency_id,
+                    ledger_id=line.ledger_id,
+                    business_partner_id=line.business_partner_id,
+                    cost_centre_id=line.cost_centre_id,
+                    profit_centre_code=line.profit_centre_code,
+                    internal_order_code=line.internal_order_code,
+                    segment_code=line.segment_code,
+                    project_code=line.project_code,
+                    tax_code=line.tax_code,
+                    line_text=line.line_text,
+                    line_metadata=line.line_metadata,
+                )
+                for line in payload.lines
+            ],
+        ),
+    )
+    return JournalEntryOut(
+        id=result.header.id,
+        document_number=result.header.document_number,
+        document_type=payload.document_type_code,
+        company_code_id=result.header.company_code_id,
+        fiscal_year=result.header.fiscal_year,
+        period=result.header.period,
+        posting_date=result.header.posting_date,
+        line_count=len(result.lines),
+        lines=[
+            JournalLineOut(
+                id=line.id,
+                line_number=line.line_number,
+                gl_account_id=line.gl_account_id,
+                debit_credit=line.debit_credit,
+                amount_local=line.amount_local,
+            )
+            for line in result.lines
+        ],
+        _meta=build_meta_block(
+            self_href=f"/fi/journal-entries/{result.header.id}",
+            actions=[
+                {
+                    "name": "reverse",
+                    "method": "POST",
+                    "href": f"/fi/journal-entries/{result.header.id}/reverse",
+                    "requires": [["fi.document", "reverse"]],
+                    "available_in": "v0.2.x",
+                },
+            ],
+            extra={"document_number": result.header.document_number},
+        ),
+    )
+
+
+__all__ = ["router"]

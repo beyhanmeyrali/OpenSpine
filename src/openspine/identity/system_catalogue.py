@@ -213,6 +213,17 @@ AUTH_OBJECTS: tuple[AuthObjectSeed, ...] = (
         description="Maintain number range definitions.",
         actions=("create", "change", "display"),
     ),
+    # Finance — universal-journal posting (v0.2 §FI core)
+    AuthObjectSeed(
+        domain="fi.document",
+        description="Post, reverse, and display universal-journal documents.",
+        actions=("post", "reverse", "display"),
+        qualifiers=(
+            ("company_code", "string_list"),
+            ("document_type", "string_list"),
+            ("amount_range", "amount_range"),
+        ),
+    ),
 )
 
 
@@ -409,6 +420,31 @@ SINGLE_ROLES: tuple[SingleRoleSeed, ...] = (
             PermissionSeed("md.number_range", "change"),
         ),
     ),
+    # FI single roles for §v0.2
+    SingleRoleSeed(
+        code="FI_DOCUMENT_POST",
+        description="Post universal-journal documents.",
+        module="fi",
+        permissions=(
+            PermissionSeed("fi.document", "post"),
+            PermissionSeed("fi.document", "display"),
+        ),
+    ),
+    SingleRoleSeed(
+        code="FI_DOCUMENT_REVERSE",
+        description="Reverse posted documents.",
+        module="fi",
+        permissions=(
+            PermissionSeed("fi.document", "reverse"),
+            PermissionSeed("fi.document", "display"),
+        ),
+    ),
+    SingleRoleSeed(
+        code="FI_DOCUMENT_DISPLAY",
+        description="Display universal-journal documents.",
+        module="fi",
+        permissions=(PermissionSeed("fi.document", "display"),),
+    ),
 )
 
 
@@ -473,6 +509,16 @@ COMPOSITE_ROLES: tuple[CompositeRoleSeed, ...] = (
             "MD_BP_CHANGE",
             "MD_MATERIAL_MAINTAIN",
         ),
+    ),
+    CompositeRoleSeed(
+        code="FI_GL_ACCOUNTANT",
+        description="Posts and reviews universal-journal documents.",
+        members=("FI_DOCUMENT_POST", "FI_DOCUMENT_DISPLAY"),
+    ),
+    CompositeRoleSeed(
+        code="FI_VIEWER",
+        description="Read-only access to FI documents.",
+        members=("FI_DOCUMENT_DISPLAY",),
     ),
 )
 

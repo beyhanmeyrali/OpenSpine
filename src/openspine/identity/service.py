@@ -653,11 +653,17 @@ async def bootstrap_tenant_and_admin(
     from openspine.md.global_seed import seed_md_globals
 
     await seed_md_globals(session, actor_principal_id=admin.id)
-    # The bootstrap admin needs full system admin AND full MD admin so
-    # the day-one operator can do every operation the happy-path
-    # acceptance test exercises (tenant config, role assignment,
-    # CC/CoA/BP/material/FX/posting-period creation).
-    for composite_key in ("SYSTEM_TENANT_ADMIN", "MD_ADMIN"):
+    # FI configuration: leading ledger + GL/reversal document types
+    # + the default fi_document number range. Idempotent.
+    from openspine.fi.seed import seed_fi_configuration
+
+    await seed_fi_configuration(session, tenant_id=tenant.id, actor_principal_id=admin.id)
+    # The bootstrap admin needs full system admin, full MD admin, and
+    # FI GL accountant so the day-one operator can do every operation
+    # the happy-path acceptance tests exercise (tenant config, role
+    # assignment, CC/CoA/BP/material/FX/posting-period creation, AND
+    # GL document posting).
+    for composite_key in ("SYSTEM_TENANT_ADMIN", "MD_ADMIN", "FI_GL_ACCOUNTANT"):
         composite = (
             await session.execute(
                 select(IdRoleComposite).where(

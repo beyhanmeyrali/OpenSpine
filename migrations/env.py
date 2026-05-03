@@ -19,6 +19,8 @@ from openspine.core.database import metadata
 # would think the schema is empty.
 import openspine.identity  # noqa: F401, E402  (registration side-effect)
 import openspine.md  # noqa: F401, E402  (registration side-effect)
+import openspine.co  # noqa: F401, E402  (registration side-effect)
+import openspine.fi  # noqa: F401, E402  (registration side-effect)
 
 config = context.config
 if config.config_file_name is not None:

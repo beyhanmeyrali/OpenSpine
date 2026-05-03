@@ -156,6 +156,8 @@ Commits on `claude/review-codebase-8XRRf`, oldest first:
 - Hybrid /md/search rewritten — Qdrant first, Postgres ILIKE fallback
 - /system/reconcile-embeddings endpoint (the §3 #4 acceptance criterion)
 - Embeddings switched to qwen3-embedding:0.6b via OpenAI /v1/embeddings
+- (v0.2 work begins 2026-05-03 — beyond v0.1 acceptance criteria)
+- FI universal journal + co_cost_centre + posting service + /fi/journal-entries
 - (further commits land below this line)
 
 ## Open questions queued

@@ -62,6 +62,12 @@ async def seeded_tenant() -> AsyncIterator[dict[str, str]]:
         for table in (
             "id_auth_decision_log",
             "id_sod_override",
+            "fin_document_line",
+            "fin_document_header",
+            "fin_document_type",
+            "fin_ledger",
+            "co_cost_centre",
+            "md_number_range",
             "id_sod_rule_clause",
             "id_sod_rule",
             "id_principal_role",
