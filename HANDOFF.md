@@ -149,6 +149,13 @@ Commits on `claude/review-codebase-8XRRf`, oldest first:
 - (§4.7 work resumed 2026-05-03)
 - Agent decision trace + /agents/traces + /md/search + _meta block (v0.1 §4.7)
 - (v0.1 feature-complete: §4.1, §4.2, §4.3, §4.4, §4.5 skeleton, §4.6, §4.7, §4.8)
+- (v0.1 close-out work resumed 2026-05-03)
+- Real /system/readiness checks (Postgres, Redis, Qdrant, Ollama)
+- CI integration lane (Postgres + Redis + Qdrant services)
+- Embedding indexer activated (in-process bus → Qdrant upsert)
+- Hybrid /md/search rewritten — Qdrant first, Postgres ILIKE fallback
+- /system/reconcile-embeddings endpoint (the §3 #4 acceptance criterion)
+- Embeddings switched to qwen3-embedding:0.6b via OpenAI /v1/embeddings
 - (further commits land below this line)
 
 ## Open questions queued

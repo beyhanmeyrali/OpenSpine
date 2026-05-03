@@ -175,11 +175,42 @@ will fold into `0.1.0` when v0.1 ships per `docs/roadmap/v0.1-foundation.md`.
 - **v0.1 is feature-complete.** §4.1 bootstrap, §4.2 identity, §4.3
   RBAC + auth-object engine, §4.4 master data, §4.5 event-bus
   skeleton, §4.6 plugin host, §4.7 agent surface, §4.8
-  observability — all landed. 151 tests pass against a live
-  Postgres + Qdrant + Redis stack. Remaining v0.1 closeouts are
-  scope-clean-up (NEEDS-INPUT.md is empty of v0.1 items) and the
-  release-candidate review per `docs/roadmap/v0.1-foundation.md`
-  §8.
+  observability — all landed.
+- **Real readiness probes.** `/system/readiness` runs concurrent
+  per-dep checks (Postgres SELECT 1, Redis PING, Qdrant /readyz,
+  Ollama /api/tags) with 2s per-probe timeout. Postgres + Redis
+  are required (down → 503). Qdrant + Ollama are optional. 5 unit
+  tests + 1 integration test.
+- **CI integration lane.** GitHub Actions services bring up
+  Postgres 16 + Redis 7 + Qdrant; the job runs alembic migrate
+  then `pytest -m integration`. Replaces the example-plugin-only
+  job. Documented in `docs/architecture/development.md`.
+- **Embedding indexer activated.** `openspine.workers.indexer` is
+  the in-process worker subscribed to `master_data.**` on the bus.
+  MD service publishes events on BP/material create; the indexer
+  embeds the indexable text and upserts into the per-tenant
+  Qdrant collection. `openspine.core.qdrant.collection_name(tenant)`
+  is the naming convention.
+- **`/md/search` rewritten** — Qdrant semantic candidates first,
+  verified against Postgres (RLS-scoped). On empty/Qdrant-down
+  the existing structured-fallback path kicks in. `_meta.source`
+  ∈ {`semantic`, `structured`} so agents see a single contract.
+- **`/system/reconcile-embeddings`** — the v0.1 §3 #4 acceptance
+  criterion. Re-walks MD entities and re-upserts vectors. Gated by
+  `system.tenant:configure`. Drop a Qdrant collection, hit this
+  endpoint, search works again.
+- **Embeddings: Qwen3-Embedding-0.6B over OpenAI-compatible
+  /v1/embeddings.** Replaces the placeholder `qwen2.5:1.5b` (which
+  was a chat model and would have errored). Real embedding model:
+  1024-d, ~640 MB, MTEB-multilingual 64.33. Works against Ollama
+  (`ollama pull qwen3-embedding:0.6b`) OR llama-server
+  (`llama-server -m Qwen3-Embedding-0.6B-Q8_0.gguf --embedding`)
+  unmodified — same OpenAI shape on both. Adopters who don't want
+  Ollama can run llama.cpp directly. Deterministic SHA-512 fallback
+  in `embed_text()` keeps CI green when no provider is reachable.
+- **161 tests pass** against the live stack (115 unit + 46
+  integration). Remaining v0.1 closeouts are the §8 acceptance
+  review (4 external reviewers).
 - **Council subagents.** Eight project-scoped Claude Code subagents
   (`md-expert`, `fico-expert`, `mm-expert`, `pp-expert`,
   `identity-expert`, `ai-agent-architect`, `plugin-architect`,
