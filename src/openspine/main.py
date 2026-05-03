@@ -23,6 +23,7 @@ from fastapi.responses import JSONResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from openspine import __version__
+from openspine.agents.router import router as agents_router
 from openspine.config import get_settings
 from openspine.core.errors import OpenSpineError
 from openspine.core.hooks import registered_hooks
@@ -114,6 +115,7 @@ app.add_middleware(MetricsMiddleware)
 app.add_middleware(PrincipalContextMiddleware)
 app.include_router(identity_router)
 app.include_router(md_router)
+app.include_router(agents_router)
 
 
 @app.exception_handler(OpenSpineError)

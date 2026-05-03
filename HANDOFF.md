@@ -76,7 +76,7 @@ Update this list as work-streams move through their states.
 | 4.4 | Master Data core | DONE | 27 md_* tables (4 globals + 23 tenant-scoped) covering org structure, calendars, CoA + GL, BP, Material, FX, posting periods, number ranges. Global currency/UoM/rate-type catalogues seeded automatically by bootstrap. System catalogue extended with 6 md.* auth objects, 8 MD single roles, MD_ADMIN + MD_STEWARD composite roles. Service layer + HTTP routes for the v0.1 happy-path entities. /md/{currencies, uoms, fiscal-year-variants, charts-of-accounts, gl-accounts, company-codes, plants, business-partners, materials, material-plants, material-valuations, fx-rates, posting-periods} all gated by enforce(). v0.1 §3 acceptance happy-path test passes end-to-end. 144/144 tests. |
 | 4.5 | Event bus + embedding pipeline | SKELETON DONE | Event envelope + EventBus protocol + InMemoryEventBus + glob pattern matcher (`*`/`**`); per-tenant Qdrant collection naming convention (`openspine__<tenant>`); embedding worker entrypoint subscribed to `master_data.**`. Real Redis/Qdrant clients deferred until integration tests can run. 41 tests pass. |
 | 4.6 | Plugin host | DONE (subject to §4.3/§4.4 wiring) | Discovery via Python entry points; pydantic-validated PluginManifest; PEP 440 compatibility check; three-state lifecycle; per-plugin record. Routes from manifest mounted on FastAPI app at startup. `/system/plugins` reports state. Example plugin in examples/openspine-plugin-example/. CI integration job installs core + example, runs `pytest -m integration` to verify the full discovery → manifest → hook → route pipeline. Auth-object registration and custom-field column generation are accepted in the manifest now and activate when §4.3 / §4.4 land. 67 tests pass. |
-| 4.7 | Agent surface | PARTIAL | Structured-error envelope done (core/errors.py + main.py exception handler — denial semantics ready for agent self-correction). Remaining pieces (`_meta` block on responses, agent-token shape, agent-decision-trace, hybrid /md/search) wait on §4.2 and §4.4. |
+| 4.7 | Agent surface | DONE | Agent-token shape + CHECK invariants landed in §4.2. Structured-error envelope already enforced via main.py exception handler. New in §4.7: id_agent_decision_trace append-only table (migration 0005), POST /agents/traces (agent-only write API), GET /md/search hybrid endpoint (Qdrant-then-structured pattern, falls back to Postgres ILIKE while embeddings populate), `_meta` self-describing block on /auth/me, /md/business-partners/{id}, /md/company-codes (POST + list). 7 agent-surface integration tests pass; 151/151 total. |
 | 4.8 | Observability | DONE | OTel tracing scaffolded with FastAPI auto-instrumentation; Prometheus `/metrics` endpoint; `MetricsMiddleware` records request count + latency by (method, route, status); domain-shaped counters/histograms (events, embedding lag, auth decisions, hook dispatch) registered. 18 tests pass. |
 
 ## Open questions accumulating for owner review
@@ -146,6 +146,9 @@ Commits on `claude/review-codebase-8XRRf`, oldest first:
 - MD ORM models + migration 0004 (v0.1 §4.4 part 1)
 - MD global catalogue seed + system auth-object extensions (v0.1 §4.4 part 2)
 - MD service layer + HTTP routes + happy-path test (v0.1 §4.4 part 3)
+- (§4.7 work resumed 2026-05-03)
+- Agent decision trace + /agents/traces + /md/search + _meta block (v0.1 §4.7)
+- (v0.1 feature-complete: §4.1, §4.2, §4.3, §4.4, §4.5 skeleton, §4.6, §4.7, §4.8)
 - (further commits land below this line)
 
 ## Open questions queued

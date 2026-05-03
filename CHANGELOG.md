@@ -150,6 +150,36 @@ will fold into `0.1.0` when v0.1 ships per `docs/roadmap/v0.1-foundation.md`.
   Material (+ plant + valuation views) → FX rate → posting period
   open → close → reopen. All against the live HTTP surface with
   a real Postgres.
+- **Agent surface (v0.1 §4.7) — feature-complete.** The third
+  audit-shaped stream lands as `id_agent_decision_trace` (migration
+  0005, append-only, the "why did the agent do X?" log per
+  `docs/identity/README.md` §"Audit topology"). `POST /agents/traces`
+  is the agent-only write endpoint — a human principal calling it
+  gets `403 not_an_agent`. The decision trace joins to the
+  corresponding `id_audit_event` row via `trace_id`.
+- **Hybrid `/md/search` endpoint.** GET /md/search?q=&entity=
+  business_partner|material returns ranked candidates with the
+  semantic-then-structured contract from `ARCHITECTURE.md` §7.
+  v0.1 ships the structured fallback (Postgres ILIKE) while the
+  Qdrant index is empty; the response shape includes
+  `_meta.source` so agents see one schema across the cold-start
+  and warm-cache states.
+- **`_meta` self-describing block.** `openspine.agents.meta`
+  exposes `build_meta_block`, `meta_for_business_partner`,
+  `meta_for_company_code`, `meta_for_search_result`. Wired into
+  `/auth/me`, `/md/business-partners` (POST + GET), and
+  `/md/company-codes` (POST + list). The block carries `self`,
+  `related`, and `actions[{name, method, href, requires}]` so an
+  agent can discover the API surface without reading external
+  docs. Future endpoints follow the same pattern.
+- **v0.1 is feature-complete.** §4.1 bootstrap, §4.2 identity, §4.3
+  RBAC + auth-object engine, §4.4 master data, §4.5 event-bus
+  skeleton, §4.6 plugin host, §4.7 agent surface, §4.8
+  observability — all landed. 151 tests pass against a live
+  Postgres + Qdrant + Redis stack. Remaining v0.1 closeouts are
+  scope-clean-up (NEEDS-INPUT.md is empty of v0.1 items) and the
+  release-candidate review per `docs/roadmap/v0.1-foundation.md`
+  §8.
 - **Council subagents.** Eight project-scoped Claude Code subagents
   (`md-expert`, `fico-expert`, `mm-expert`, `pp-expert`,
   `identity-expert`, `ai-agent-architect`, `plugin-architect`,

@@ -66,6 +66,9 @@ class MeResponse(BaseModel):
     principal_kind: str | None
     auth_method: str
     is_anonymous: bool
+    meta: dict[str, Any] | None = Field(default=None, alias="_meta")
+
+    model_config = {"populate_by_name": True}
 
 
 class IssueTokenRequest(BaseModel):
@@ -233,13 +236,32 @@ async def logout(request: Request, response: Response) -> Response:
 
 @router.get("/me", response_model=MeResponse)
 async def me(request: Request) -> MeResponse:
+    from openspine.agents.meta import build_meta_block
+
     ctx = _principal_context(request)
+    actions: list[dict[str, Any]] = [
+        {"name": "logout", "method": "POST", "href": "/auth/logout"},
+        {"name": "issue_token", "method": "POST", "href": "/auth/tokens"},
+        {"name": "enrol_totp", "method": "POST", "href": "/auth/totp/enrol"},
+    ]
+    related = {
+        "tokens": "/auth/tokens",
+    }
+    if ctx.principal_kind == "agent":
+        actions.append(
+            {
+                "name": "write_decision_trace",
+                "method": "POST",
+                "href": "/agents/traces",
+            }
+        )
     return MeResponse(
         principal_id=ctx.principal_id,
         tenant_id=ctx.tenant_id,
         principal_kind=ctx.principal_kind,
         auth_method=ctx.auth_method,
         is_anonymous=ctx.is_anonymous,
+        _meta=build_meta_block(self_href="/auth/me", related=related, actions=actions),
     )
 
 

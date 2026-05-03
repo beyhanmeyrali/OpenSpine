@@ -22,6 +22,11 @@ from fastapi import APIRouter, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
+from openspine.agents.meta import (
+    meta_for_business_partner,
+    meta_for_company_code,
+    meta_for_search_result,
+)
 from openspine.core.errors import AuthenticationError, NotFoundError
 from openspine.identity.authz import enforce
 from openspine.identity.context import PrincipalContext
@@ -31,6 +36,7 @@ from openspine.md.models import (
     MdBusinessPartner,
     MdCompanyCode,
     MdCurrency,
+    MdMaterial,
     MdUom,
 )
 
@@ -236,6 +242,9 @@ class CompanyCodeOut(BaseModel):
     code: str
     name: str
     country_code: str
+    meta: dict[str, Any] | None = Field(default=None, alias="_meta")
+
+    model_config = {"populate_by_name": True}
 
 
 @router.post(
@@ -259,7 +268,13 @@ async def create_company_code_endpoint(payload: CompanyCodeIn, request: Request)
         fiscal_year_variant_id=payload.fiscal_year_variant_id,
         controlling_area_id=payload.controlling_area_id,
     )
-    return CompanyCodeOut(id=row.id, code=row.code, name=row.name, country_code=row.country_code)
+    return CompanyCodeOut(
+        id=row.id,
+        code=row.code,
+        name=row.name,
+        country_code=row.country_code,
+        _meta=meta_for_company_code(row.id),
+    )
 
 
 @router.get("/company-codes", response_model=list[CompanyCodeOut])
@@ -271,7 +286,14 @@ async def list_company_codes(request: Request) -> list[CompanyCodeOut]:
         (await session.execute(select(MdCompanyCode).order_by(MdCompanyCode.code))).scalars().all()
     )
     return [
-        CompanyCodeOut(id=r.id, code=r.code, name=r.name, country_code=r.country_code) for r in rows
+        CompanyCodeOut(
+            id=r.id,
+            code=r.code,
+            name=r.name,
+            country_code=r.country_code,
+            _meta=meta_for_company_code(r.id),
+        )
+        for r in rows
     ]
 
 
@@ -344,6 +366,9 @@ class BusinessPartnerOut(BaseModel):
     kind: str
     name: str
     roles: list[str]
+    meta: dict[str, Any] | None = Field(default=None, alias="_meta")
+
+    model_config = {"populate_by_name": True}
 
 
 @router.post(
@@ -372,7 +397,12 @@ async def create_business_partner_endpoint(
         addresses=[a.model_dump() for a in payload.addresses],
     )
     return BusinessPartnerOut(
-        id=bp.id, number=bp.number, kind=bp.kind, name=bp.name, roles=payload.roles
+        id=bp.id,
+        number=bp.number,
+        kind=bp.kind,
+        name=bp.name,
+        roles=payload.roles,
+        _meta=meta_for_business_partner(bp.id),
     )
 
 
@@ -397,7 +427,12 @@ async def get_business_partner_endpoint(bp_id: uuid.UUID, request: Request) -> B
         .all()
     )
     return BusinessPartnerOut(
-        id=bp.id, number=bp.number, kind=bp.kind, name=bp.name, roles=list(roles)
+        id=bp.id,
+        number=bp.number,
+        kind=bp.kind,
+        name=bp.name,
+        roles=list(roles),
+        _meta=meta_for_business_partner(bp.id),
     )
 
 
@@ -609,6 +644,121 @@ async def set_posting_period_state_endpoint(
     )
     return PostingPeriodOut(
         id=row.id, fiscal_year=row.fiscal_year, period=row.period, state=row.state
+    )
+
+
+# ---------------------------------------------------------------------------
+# Hybrid search — semantic candidates + structured verification
+# ---------------------------------------------------------------------------
+
+
+class SearchHit(BaseModel):
+    """A single hit. `id` is the Postgres row's UUID; `score` is the
+    semantic distance (None when the hit came from the structured
+    fallback). `source` distinguishes — agents read this to know
+    whether to weight the ranking or treat it as exact."""
+
+    id: uuid.UUID
+    entity: str
+    number: str | None = None
+    name: str
+    description: str | None = None
+    score: float | None = None
+    source: str  # 'semantic' | 'structured'
+
+
+class SearchResponse(BaseModel):
+    hits: list[SearchHit]
+    meta: dict[str, Any] | None = Field(default=None, alias="_meta")
+
+    model_config = {"populate_by_name": True}
+
+
+_SEARCHABLE_ENTITIES = ("business_partner", "material")
+
+
+@router.get("/search", response_model=SearchResponse)
+async def hybrid_search(
+    request: Request, q: str, entity: str = "business_partner", limit: int = 10
+) -> SearchResponse:
+    """Hybrid search per ARCHITECTURE.md §7.
+
+    Semantic candidates from Qdrant (when available) → structured
+    verification against Postgres → return both rankings + the
+    verifying rows.
+
+    v0.1 simplification: Qdrant has no vectors yet (the embedding
+    worker writes them when entities change post-§4.5; v0.2 work
+    expands this). Until vectors exist, the endpoint falls back to
+    Postgres ILIKE — same response shape, `source='structured'`,
+    `score=None`. The contract is what matters; agents see one shape
+    and don't have to special-case the empty-index startup state.
+    """
+    ctx = _ctx(request)
+    if entity not in _SEARCHABLE_ENTITIES:
+        raise NotFoundError(
+            f"unsupported entity {entity!r}",
+            domain="md.search",
+            action="display",
+            reason="unknown_entity",
+            allowed={"entities": list(_SEARCHABLE_ENTITIES)},
+        )
+    session = get_request_session()
+    # Authority gate: display permission on the entity.
+    await enforce(session, ctx=ctx, domain=f"md.{entity}", action="display")
+
+    # In v0.1, the structured fallback is the only path that returns
+    # rows (Qdrant has nothing to index yet). When the embedding
+    # worker starts populating vectors, the Qdrant lookup goes here
+    # and the fallback runs only on miss.
+    pattern = f"%{q}%"
+    if entity == "business_partner":
+        rows_bp = (
+            (
+                await session.execute(
+                    select(MdBusinessPartner)
+                    .where(MdBusinessPartner.name.ilike(pattern))
+                    .limit(limit)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        hits = [
+            SearchHit(
+                id=r.id,
+                entity="business_partner",
+                number=r.number,
+                name=r.name,
+                source="structured",
+            )
+            for r in rows_bp
+        ]
+    else:  # material
+        rows_mat = (
+            (
+                await session.execute(
+                    select(MdMaterial).where(MdMaterial.description.ilike(pattern)).limit(limit)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        hits = [
+            SearchHit(
+                id=r.id,
+                entity="material",
+                number=r.number,
+                name=r.description,
+                description=r.description,
+                source="structured",
+            )
+            for r in rows_mat
+        ]
+
+    return SearchResponse(
+        hits=hits,
+        _meta=meta_for_search_result(query=q, entity=entity, source="structured", total=len(hits)),
     )
 
 

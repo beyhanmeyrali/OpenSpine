@@ -28,6 +28,7 @@ from openspine.identity.models import (
     IdToken,
 )
 from openspine.identity.rbac_models import (
+    IdAgentDecisionTrace,
     IdAuthDecisionLog,
     IdAuthObject,
     IdAuthObjectAction,
@@ -43,6 +44,7 @@ from openspine.identity.rbac_models import (
 )
 
 __all__ = [
+    "IdAgentDecisionTrace",
     "IdAgentProfile",
     "IdAuditEvent",
     "IdAuthDecisionLog",

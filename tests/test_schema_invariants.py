@@ -64,13 +64,17 @@ _APPEND_ONLY: frozenset[str] = frozenset(
         # a system audit. The tests below add it to _NO_AUDIT_COLUMNS as
         # the explicit exemption.
         "id_auth_decision_log",
+        # id_agent_decision_trace is the third append-only audit stream
+        # ("why did the agent do X"). Carries created_at + principal_id
+        # (the agent) but no created_by — same pattern as the decision log.
+        "id_agent_decision_trace",
     }
 )
 
-# Append-only tables where even the standard `created_at` / `created_by`
-# columns aren't carried, because the table substitutes its own
-# domain-specific columns (e.g., `evaluated_at` on the decision log).
-_NO_AUDIT_COLUMNS: frozenset[str] = frozenset({"id_auth_decision_log"})
+# Append-only tables where the standard `created_by` column isn't
+# carried, because the row's `principal_id` (the actor) already serves
+# that role and a separate created_by would always be redundant.
+_NO_AUDIT_COLUMNS: frozenset[str] = frozenset({"id_auth_decision_log", "id_agent_decision_trace"})
 
 # Allowed table prefixes per data-model.md. `alembic_version` is the
 # Alembic bookkeeping table, exempted.

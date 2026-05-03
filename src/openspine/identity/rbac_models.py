@@ -442,6 +442,80 @@ class IdAuthDecisionLog(Base):
 
 
 # ---------------------------------------------------------------------------
+# Agent decision trace (append-only, distinct from id_audit_event +
+# id_auth_decision_log per docs/identity/README.md §"Audit topology").
+# ---------------------------------------------------------------------------
+
+
+class IdAgentDecisionTrace(Base):
+    """The "why" stream for agent actions.
+
+    Per `docs/identity/README.md` §"Audit topology", this answers
+    "why did the agent do what it did?". Joins to the corresponding
+    `id_audit_event` row (the "what") and any `id_auth_decision_log`
+    rows (the "allowed?") via `trace_id`.
+
+    `candidates_considered` and `chosen_path` are JSONB so the
+    embedding payload, candidate scores, and final selection all
+    survive the round-trip. This is what reviewers use to reconstruct
+    an agent's decision a year later.
+
+    Append-only — like every audit-shaped table. No trigger, no
+    `updated_*`, no `version`.
+    """
+
+    __tablename__ = "id_agent_decision_trace"
+    __table_args__ = (
+        Index(
+            "ix_id_agent_decision_trace_tenant_principal",
+            "tenant_id",
+            "principal_id",
+        ),
+        Index("ix_id_agent_decision_trace_principal", "principal_id"),
+        Index("ix_id_agent_decision_trace_trace", "trace_id"),
+        Index("ix_id_agent_decision_trace_created_at", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("id_tenant.id", deferrable=True, initially="DEFERRED"),
+        nullable=False,
+    )
+    principal_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("id_principal.id", deferrable=True, initially="DEFERRED"),
+        nullable=False,
+    )
+    trace_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    action_summary: Mapped[str] = mapped_column(Text, nullable=False)
+    reasoning: Mapped[str] = mapped_column(Text, nullable=False)
+    candidates_considered: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    chosen_path: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    related_audit_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("id_audit_event.id", deferrable=True, initially="DEFERRED"),
+        nullable=True,
+        index=True,
+    )
+    model: Mapped[str | None] = mapped_column(Text, nullable=True)
+    model_version: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Registries (consumed by migration + schema-invariants test)
 # ---------------------------------------------------------------------------
 
@@ -463,6 +537,7 @@ RBAC_TABLES_WITH_UPDATE_TRIGGER: tuple[str, ...] = (
 RBAC_TABLES_WITH_RLS: tuple[str, ...] = (
     *RBAC_TABLES_WITH_UPDATE_TRIGGER,
     IdAuthDecisionLog.__tablename__,
+    IdAgentDecisionTrace.__tablename__,
 )
 
 
@@ -473,6 +548,7 @@ __all__ = [
     "RBAC_TABLES_WITH_UPDATE_TRIGGER",
     "ROLE_KINDS",
     "SOD_SEVERITIES",
+    "IdAgentDecisionTrace",
     "IdAuthDecisionLog",
     "IdAuthObject",
     "IdAuthObjectAction",
