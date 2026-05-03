@@ -71,9 +71,9 @@ Update this list as work-streams move through their states.
 | § | Stream | State | Notes |
 |---|--------|-------|-------|
 | 4.1 | Bootstrap | DONE | Commit `e7d9439`. 14 tests pass. |
-| 4.2 | Identity core | PENDING-COUNCIL-DRAFT | Tenant isolation locked (ADR 0005, shared+RLS only). Mechanical scaffolding now in place: SQLAlchemy declarative Base + AuditMixin + BusinessTableMixin per docs/architecture/data-model.md (commit cb1ad97). Strategic decisions (column types per entity, RLS policy shape, audit-trigger pattern, agent-token shape) reserved for the council per owner direction. |
-| 4.3 | RBAC + auth-object engine | BLOCKED-ON-4.2 | Needs identity tables first. |
-| 4.4 | Master Data core | BLOCKED-ON-4.2 | Needs `tenant_id` and RLS in place first. |
+| 4.2 | Identity core | DONE | Ten `id_*` tables; one shared trigger function; RLS on every tenant-scoped table. Single-table `id_token` discriminated by `kind`; agent-token CHECK invariants enforced at the database. Argon2id passwords + pyotp TOTP + SHA-256-stored opaque tokens. `/auth/{login,logout,me,tokens,totp/{enrol,verify}}` HTTP surface. Principal-context middleware + RLS GUC plumbing. `openspine create-tenant` bootstrap CLI. Schema-invariants test runs against ORM metadata. 115 unit tests + 7 integration tests pass. Pending pieces (RBAC, auth-object engine, decision log) land in §4.3 as planned. |
+| 4.3 | RBAC + auth-object engine | NOT-STARTED | Identity tables now exist; this is the next critical-path item. |
+| 4.4 | Master Data core | NOT-STARTED | `tenant_id` and RLS plumbing now landed; can begin in parallel with §4.3. |
 | 4.5 | Event bus + embedding pipeline | SKELETON DONE | Event envelope + EventBus protocol + InMemoryEventBus + glob pattern matcher (`*`/`**`); per-tenant Qdrant collection naming convention (`openspine__<tenant>`); embedding worker entrypoint subscribed to `master_data.**`. Real Redis/Qdrant clients deferred until integration tests can run. 41 tests pass. |
 | 4.6 | Plugin host | DONE (subject to §4.3/§4.4 wiring) | Discovery via Python entry points; pydantic-validated PluginManifest; PEP 440 compatibility check; three-state lifecycle; per-plugin record. Routes from manifest mounted on FastAPI app at startup. `/system/plugins` reports state. Example plugin in examples/openspine-plugin-example/. CI integration job installs core + example, runs `pytest -m integration` to verify the full discovery → manifest → hook → route pipeline. Auth-object registration and custom-field column generation are accepted in the manifest now and activate when §4.3 / §4.4 land. 67 tests pass. |
 | 4.7 | Agent surface | PARTIAL | Structured-error envelope done (core/errors.py + main.py exception handler — denial semantics ready for agent self-correction). Remaining pieces (`_meta` block on responses, agent-token shape, agent-decision-trace, hybrid /md/search) wait on §4.2 and §4.4. |
@@ -130,6 +130,13 @@ Commits on `claude/review-codebase-8XRRf`, oldest first:
 - Add CI integration job that proves the example plugin works end-to-end
 - Add CHANGELOG.md, refresh CONTRIBUTING, add example-plugin tests
 - SQLAlchemy declarative base + audit/tenant mixins
+- (council-deferred §4.2 work resumed 2026-05-03)
+- Identity ORM models + deferrable FKs (v0.1 §4.2 part 1)
+- 0002 identity-core migration + schema-invariants test
+- Identity security primitives (passwords, TOTP, opaque tokens)
+- Audit-event writer + principal-context middleware
+- Auth router + service layer + integration tests
+- Bootstrap management CLI: openspine create-tenant
 - (further commits land below this line)
 
 ## Open questions queued
@@ -144,8 +151,6 @@ See `NEEDS-INPUT.md`. Most items resolved in the morning council pass:
 Still open by deliberate deferral:
 
 - AGPL plugin distribution (owner deferred until adopter asks)
-- Identity §4.2 schema design (owner directed council-first; defer until
-  a future session can convene the council)
 
 The remaining open items in `tenancy.md` are post-v1.0.
 

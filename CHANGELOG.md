@@ -36,6 +36,44 @@ will fold into `0.1.0` when v0.1 ships per `docs/roadmap/v0.1-foundation.md`.
   (`loaded` / `skipped_incompatible` / `failed`), route mounting,
   `/system/plugins` endpoint. Reference plugin in
   `examples/openspine-plugin-example/`.
+- **Identity core (v0.1 §4.2).** Ten `id_*` tables with full RLS:
+  `id_tenant` (global registry, no RLS), `id_tenant_setting`,
+  `id_principal` (single table for human/agent/technical),
+  `id_human_profile`, `id_agent_profile`, `id_credential`,
+  `id_session`, `id_token` (single table; `kind` discriminates;
+  agent-token CHECK enforces expires_at + provisioner + reason at
+  the database level), `id_federated_identity` (stub for v0.2 SSO),
+  `id_audit_event` (append-only). One reusable
+  `_id_touch_updated_audit()` plpgsql trigger function. Bootstrap
+  cycle resolved via `DEFERRABLE INITIALLY DEFERRED` FKs on the
+  audit-author and tenant-id columns. Full schema-invariants test
+  (`tests/test_schema_invariants.py`) catches drift on tenant-id,
+  audit columns, FK indexes, VARCHAR types, and table prefixes.
+- **Identity security primitives.** Argon2id passwords (with
+  forward-compat parameter-tuning via `check_needs_rehash`); pyotp
+  TOTP (RFC 6238 defaults); opaque 256-bit tokens with SHA-256
+  storage and constant-time verification. The shift to SHA-256 for
+  tokens (from argon2id in `authentication.md` v0) is documented
+  inline with rationale: argon2 defends low-entropy secrets;
+  256-bit cryptographic randoms gain nothing from it and pay ~50ms
+  per request.
+- **Auth surface.** `POST /auth/login` (password + optional TOTP),
+  `POST /auth/logout`, `GET /auth/me`, `POST /auth/tokens` (issue
+  user_api / agent / service tokens), `DELETE /auth/tokens/{id}`,
+  `POST /auth/totp/enrol`, `POST /auth/totp/verify`. The login
+  envelope is identical for unknown-tenant, unknown-user, and
+  wrong-password cases — no enumeration leak. Wrong-password path
+  re-hashes if argon2 parameters drifted.
+- **Principal-context middleware.** Per-request identity resolution
+  (bearer token first, then session cookie, then anonymous), W3C
+  trace-context propagation, `SET LOCAL openspine.tenant_id` for
+  RLS. Anonymous fast-path skips the DB transaction.
+- **Bootstrap CLI.** `openspine create-tenant --name --slug
+  --admin-email [...]` atomically seeds the first tenant + admin +
+  password credential. Runs offline against the database — no
+  privileged anonymous HTTP path needed. Honours
+  `OPENSPINE_BOOTSTRAP_ADMIN_PASSWORD` env var; auto-generates and
+  prints once otherwise.
 - **Council subagents.** Eight project-scoped Claude Code subagents
   (`md-expert`, `fico-expert`, `mm-expert`, `pp-expert`,
   `identity-expert`, `ai-agent-architect`, `plugin-architect`,
@@ -60,6 +98,15 @@ will fold into `0.1.0` when v0.1 ships per `docs/roadmap/v0.1-foundation.md`.
   (average), never `B` or `G`.
 - **FI hook names** renamed `fi_document.*` → `journal_entry.*` per
   ADR 0008.
+- **Token storage hash** in `docs/identity/authentication.md` —
+  argon2id replaced with SHA-256 for token plaintexts (argon2 only
+  for low-entropy passwords; rationale in
+  `src/openspine/identity/security.py`).
+- **Audit-author FK indexing** in `docs/architecture/data-model.md`
+  — clarified that `created_by`/`updated_by` are exempt from the
+  "every FK gets an index" rule (write-amplifying on every business
+  write, rare on routine reads). Schema-invariants test exempts
+  these columns.
 
 ### Decisions (ADRs)
 
@@ -83,8 +130,5 @@ The following are deliberately deferred per owner direction:
 
 - **ADR 0004** — AGPL + plugin-distribution legal nuance. Held for
   legal counsel involvement.
-- **§4.2 identity-core schema** — Strategic decisions go through
-  council (`identity-expert` + `ai-agent-architect` + `solution-architect`)
-  before implementation.
 
 [Unreleased]: https://github.com/beyhanmeyrali/openspine/compare/main...claude/review-codebase-8XRRf
