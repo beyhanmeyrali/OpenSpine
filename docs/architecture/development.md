@@ -36,6 +36,31 @@ make revision MSG="describe the change"   # new Alembic migration
 make reset-db     # drop + recreate db + run migrations
 ```
 
+## Running tests
+
+There are two test classes:
+
+- **Unit tests** (default) — no infrastructure required. ORM
+  metadata, pure-function security primitives, request validation
+  via FastAPI TestClient.
+  ```bash
+  pytest -m "not integration"
+  ```
+- **Integration tests** — require the local stack
+  (`make up && make migrate`). They exercise the full HTTP surface
+  against a live Postgres, real Redis, real Qdrant, and the
+  identity / RBAC / MD / agent flows end-to-end.
+  ```bash
+  make up && make migrate
+  pytest -m integration
+  ```
+
+CI runs both classes in separate jobs. The integration job
+brings up Postgres + Redis + Qdrant as GitHub Actions services
+and runs `pytest -m integration`. Ollama isn't started in CI —
+embedding-pipeline tests skip when it's unreachable per the
+optional-dep contract in `core/readiness.py`.
+
 ## Layout
 
 ```
