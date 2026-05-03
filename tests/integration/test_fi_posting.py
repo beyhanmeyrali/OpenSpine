@@ -571,18 +571,14 @@ async def test_reverse_round_trip_links_originals_and_swaps_signs(
     tenant_id = uuid.UUID(bundle["tenant_id"])
     async with SessionFactory() as db:
         await db.execute(
-            text("SELECT set_config('openspine.tenant_id', :t, true)").bindparams(
-                t=str(tenant_id)
-            )
+            text("SELECT set_config('openspine.tenant_id', :t, true)").bindparams(t=str(tenant_id))
         )
         original = await db.get(FinDocumentHeader, uuid.UUID(original_id))
         reversal = await db.get(FinDocumentHeader, uuid.UUID(rev_id))
         rev_lines = (
             (
                 await db.execute(
-                    select(FinDocumentLine).where(
-                        FinDocumentLine.document_header_id == reversal.id
-                    )
+                    select(FinDocumentLine).where(FinDocumentLine.document_header_id == reversal.id)
                 )
             )
             .scalars()
@@ -594,12 +590,8 @@ async def test_reverse_round_trip_links_originals_and_swaps_signs(
     assert original.reversed_by_id == reversal.id
     assert reversal.reversal_of_id == original.id
     # Original was D-cash / C-revenue; reversal must swap.
-    debit_acct = next(
-        line.gl_account_id for line in rev_lines if line.debit_credit == "D"
-    )
-    credit_acct = next(
-        line.gl_account_id for line in rev_lines if line.debit_credit == "C"
-    )
+    debit_acct = next(line.gl_account_id for line in rev_lines if line.debit_credit == "D")
+    credit_acct = next(line.gl_account_id for line in rev_lines if line.debit_credit == "C")
     assert str(debit_acct) == bundle["gl_revenue"]
     assert str(credit_acct) == bundle["gl_cash"]
 

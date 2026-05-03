@@ -40,6 +40,22 @@ DOCUMENT_TYPES: tuple[tuple[str, str, str, str, str, bool], ...] = (
         "fi_document",
         True,
     ),
+    (
+        "KR",
+        "KR",
+        "Vendor Invoice (AP)",
+        "Vendor invoice — posts to a vendor reconciliation account.",
+        "fi_document",
+        False,
+    ),
+    (
+        "DR",
+        "DR",
+        "Customer Invoice (AR)",
+        "Customer invoice — posts to a customer reconciliation account.",
+        "fi_document",
+        False,
+    ),
 )
 
 

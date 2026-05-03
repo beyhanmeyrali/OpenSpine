@@ -159,6 +159,7 @@ Commits on `claude/review-codebase-8XRRf`, oldest first:
 - (v0.2 work begins 2026-05-03 — beyond v0.1 acceptance criteria)
 - FI universal journal + co_cost_centre + posting service + /fi/journal-entries
 - FI document reverse + display (GET single, list-by-period)
+- AP invoice posting (KR doc) + open-item view + KR/DR document types seeded
 - (further commits land below this line)
 
 ## Open questions queued
