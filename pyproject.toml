@@ -67,6 +67,9 @@ Homepage = "https://github.com/beyhanmeyrali/openspine"
 Documentation = "https://github.com/beyhanmeyrali/openspine#readme"
 Issues = "https://github.com/beyhanmeyrali/openspine/issues"
 
+[project.scripts]
+openspine = "openspine.identity.cli:main"
+
 [project.entry-points."openspine.plugins"]
 # Plugins register themselves here. Example: see examples/openspine-plugin-example/.
 
