@@ -7,6 +7,30 @@
 
 ---
 
+## Where we are (as of 2026-05-04)
+
+**v0.1 is feature-complete; v0.2 (Finance core) is in active build.** The system runs end-to-end against a live Postgres + Qdrant + Redis stack. **181 tests pass** (122 unit + 59 integration) — the integration suite exercises the full HTTP surface, RLS, the auth-object engine, the universal-journal posting + reverse + AP invoice paths, and the embedding-indexer dual-write loop.
+
+| Module / surface | Status | What landed |
+|---|---|---|
+| **Bootstrap + tooling** | ✅ done | `pyproject.toml`, `docker-compose.yml`, Makefile, `.env.example`, pre-commit, GitHub Actions CI (lint + typecheck + unit + integration jobs with Postgres/Redis/Qdrant services) |
+| **Identity (§4.2)** | ✅ done | 10 `id_*` tables, RLS on every tenant-scoped table, single-table `id_token` with agent-token CHECK invariants, argon2id passwords + pyotp TOTP + SHA-256 opaque tokens, `/auth/{login,logout,me,tokens,totp/{enrol,verify}}`, principal-context middleware, `openspine create-tenant` bootstrap CLI |
+| **RBAC + auth-object engine (§4.3)** | ✅ done | 12 RBAC tables, system catalogue (13 auth objects, 17 single roles, 4 composites, 4 SoD baseline rules) auto-seeded by bootstrap, `evaluate()` + `enforce()` + `@requires_auth` with composite-role expansion, 4 qualifier matchers, SoD-before-allow, append-only decision log, role-assignment endpoints |
+| **Master Data (§4.4)** | ✅ done | 27 `md_*` tables (4 globals + 23 tenant-scoped) covering org structure, calendars, CoA + GL, BP, Material, FX, posting periods, number ranges. Currency / UoM / rate-type catalogues seeded automatically. Full `/md/*` HTTP surface |
+| **Event bus + embedding worker (§4.5)** | ✅ done | `Event`/`EventBus` Protocol + `InMemoryEventBus`, indexer subscribed to `master_data.**` writes vectors to per-tenant Qdrant collections. **Qwen3-Embedding-0.6B** (1024-d) via OpenAI-compatible `/v1/embeddings` — works with Ollama OR llama-server unmodified. Deterministic SHA-512 fallback for CI |
+| **Plugin host (§4.6)** | ✅ done | Discovery via Python entry points, pydantic-validated `plugin.yaml`, PEP 440 compatibility check, route mounting, hook dispatcher, custom-field surface, reference plugin in `examples/openspine-plugin-example/` |
+| **Agent surface (§4.7)** | ✅ done | `id_agent_decision_trace` (the "why" stream), `POST /agents/traces`, hybrid `GET /md/search` (Qdrant first, Postgres ILIKE fallback), `_meta` self-describing block on representative endpoints |
+| **Observability (§4.8)** | ✅ done | OTel tracing + Prometheus metrics, real `/system/readiness` probes (Pg/Redis required, Qdrant/Ollama optional), `/system/reconcile-embeddings` for the §3 #4 acceptance criterion |
+| **FI universal journal (v0.2)** | 🚧 in progress | **Schema**: `fin_ledger`, `fin_document_type`, `fin_document_header` + `fin_document_line` (append-only, wide CO-aware), `co_cost_centre`. **Service**: `post_journal_entry` enforces balanced-per-(ledger, currency) + period-open + GL-valid + gap-free document number. **Endpoints**: post, reverse (`AB` doc with cross-pointers), GET single, list-by-period, AP invoice (`KR` doc), open items (read-side derivation). **Hooks**: `journal_entry.{pre_post,pre_reverse}`. **Roles**: `FI_GL_ACCOUNTANT` + `FI_VIEWER` |
+
+**Critical-path next:** AP payment + `fin_clearing` table → AR invoice + receipt → GL display by account.
+
+**Try it locally:** `make up && make migrate && make run` then `openspine create-tenant --name "Acme" --slug acme --admin-email admin@acme.example`. Full dev guide in [`docs/architecture/development.md`](./docs/architecture/development.md).
+
+See [HANDOFF.md](./HANDOFF.md) and [CHANGELOG.md](./CHANGELOG.md) for the per-commit ledger.
+
+---
+
 ## Why OpenSpine?
 
 Enterprise Resource Planning should not be a privilege of companies that can afford seven-figure licenses. SAP, Oracle, Microsoft Dynamics, and their peers have built extraordinary software — and locked it behind pricing, consultant ecosystems, and deployment complexity that exclude the mid-market, emerging economies, and ambitious smaller enterprises.
@@ -83,8 +107,8 @@ Deliberately **out of scope** for Phase 1: HR, Plant Maintenance, Quality Manage
 
 ## Roadmap
 
-- **v0.1 — Foundation.** Auth, tenancy, core master data (Company Code, Chart of Accounts, Material Master, Vendor, Customer). PostgreSQL + Qdrant dual-write pipeline.
-- **v0.2 — Finance core.** General Ledger, posting engine, document types, fiscal year/period management.
+- **v0.1 — Foundation.** ✅ Complete. Auth, tenancy, RBAC + auth-object engine, master data, plugin host, agent surface, observability, embedding pipeline.
+- **v0.2 — Finance core.** 🚧 In progress. Universal journal (post + reverse + display) + AP invoice + open-item view all live; AP payment + clearing + AR mirror in flight.
 - **v0.3 — Materials Management.** Purchase Requisitions, Purchase Orders, Goods Receipt, Invoice Verification.
 - **v0.4 — Production Planning.** BOM, Routing, Work Centers, basic MRP run.
 - **v0.5 — AI agents.** Semantic search UI, agentic document understanding, natural-language reporting.
@@ -92,9 +116,9 @@ Deliberately **out of scope** for Phase 1: HR, Plant Maintenance, Quality Manage
 
 ## Status
 
-**Pre-alpha.** Architecture and foundation in active development. Not yet runnable.
+**Pre-alpha, runnable.** v0.1 feature-complete; v0.2 Finance core actively being built. 181 automated tests pass against a live Postgres + Qdrant + Redis stack. See the [Where we are](#where-we-are-as-of-2026-05-04) section for details.
 
-Follow the repository for progress. First public release target: Q3 2026.
+First public release target: Q3 2026.
 
 ## Extending OpenSpine
 
